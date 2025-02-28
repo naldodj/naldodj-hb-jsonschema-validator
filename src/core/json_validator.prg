@@ -290,6 +290,7 @@ method CheckRequired(hData as hash,aRequired as array,cPath as character) class 
                 lValid:=.F.
             endif
         next
+
     end sequence
 
     return(lValid)
