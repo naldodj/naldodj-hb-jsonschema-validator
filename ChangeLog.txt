@@ -3,6 +3,12 @@
    Entries may not always be in chronological/commit order.
    See license at the end of file. */
 
+2025-02-28 16:19 UTC naldodj (enum)
+  * src/core/json_validator.prg
+  + src/tst/json_validator.prg (symbolic lynk)
+  * src/tst/json_validator_tst.exe
+  * src/tst/json_validator_tst.prg
+
 2025-02-28 14:23 UTC naldodj (add src/tst/README.md)
   + src/tst/README.md
 

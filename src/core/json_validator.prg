@@ -27,9 +27,10 @@ class JSONValidator
     method New(cSchema as character) constructor
 
     method CheckArray(aValue as array,hSchema as hash,cPath as character) as logical
+    method CheckEnum(xValue as anytype,aEnum as array,cPath as character) as logical
     method CheckPattern(cValue as character,cPattern as character,cPath as character) as logical
     method CheckRequired(hData as hash,aRequired as array,cPath as character) as logical
-    method CheckType(xValue as anytype,cType as character,cPath as character) as logical
+    method CheckType(xValue as anytype,xType as anytype,cPath as character) as logical
 
     method Reset(cSchema as character) as logical
 
@@ -82,33 +83,41 @@ method ValidateObject(hData as hash,hSchema as hash,cPath as character) class JS
 
     local lValid as logical
 
+    local xType as anytype
+
     hb_Default(@cPath,"root")
 
     begin sequence
         if (hb_HHasKey(hSchema,"type"))
-            cType:=hSchema["type"]
-            lValid:=self:CheckType(hData,cType,cPath)
+            xType:=hSchema["type"]
+            lValid:=self:CheckType(hData,xType,cPath)
             if (!lValid)
                 break
             endif
-            switch Lower(cType)
-                case "array"
-                    if (hb_HHasKey(hSchema,"items"))
-                        lValid:=self:CheckArray(hData,hSchema,cPath)
-                        if (!lValid)
-                            break
+            if (hb_HHasKey(hSchema,"enum"))
+                self:CheckEnum(hData,hSchema["enum"],cPath)
+            endif
+            if (valType(xType)=="C")
+                cType:=xType
+                switch Lower(cType)
+                    case "array"
+                        if (hb_HHasKey(hSchema,"items"))
+                            lValid:=self:CheckArray(hData,hSchema,cPath)
+                            if (!lValid)
+                                break
+                            endif
                         endif
-                    endif
-                    exit
-                case "string"
-                    if (hb_HHasKey(hSchema,"pattern"))
-                        lValid:=self:CheckPattern(hData,hSchema["pattern"],cPath)
-                        if (!lValid)
-                            break
+                        exit
+                    case "string"
+                        if (hb_HHasKey(hSchema,"pattern"))
+                            lValid:=self:CheckPattern(hData,hSchema["pattern"],cPath)
+                            if (!lValid)
+                                break
+                            endif
                         endif
-                    endif
-                    exit
-            end switch
+                        exit
+                end switch
+            endif
         endif
 
         if (hb_HHasKey(hSchema,"required"))
@@ -121,23 +130,29 @@ method ValidateObject(hData as hash,hSchema as hash,cPath as character) class JS
             for each cProperty in hb_HKeys(hProperties)
                 if (hb_HHasKey(hData,cProperty))
                     if (hb_HHasKey(hProperties[cProperty],"type"))
-                        cType:=hProperties[cProperty]["type"]
-                        self:CheckType(hData[cProperty],cType,cPath+"."+cProperty)
-                        switch Lower(cType)
-                            case "array"
-                                if (hb_HHasKey(hProperties[cProperty],"items"))
-                                    self:CheckArray(hData[cProperty],hProperties[cProperty],cPath+"."+cProperty)
-                                endif
-                                exit
-                            case "string"
-                                if (hb_HHasKey(hProperties[cProperty],"pattern"))
-                                    self:CheckPattern(hData[cProperty],hProperties[cProperty]["pattern"],cPath+"."+cProperty)
-                                endif
-                                exit
-                            case "object"
-                                self:ValidateObject(hData[cProperty],hProperties[cProperty],cPath+"."+cProperty)
-                                exit
-                        end switch
+                        xType:=hProperties[cProperty]["type"]
+                        self:CheckType(hData[cProperty],xType,cPath+"."+cProperty)
+                        if (hb_HHasKey(hProperties[cProperty],"enum"))
+                            self:CheckEnum(hData[cProperty],hProperties[cProperty]["enum"],cPath+"."+cProperty)
+                        endif
+                        if (valtype(xType)=="C")
+                            cType:=xType
+                            switch Lower(cType)
+                                case "array"
+                                    if (hb_HHasKey(hProperties[cProperty],"items"))
+                                        self:CheckArray(hData[cProperty],hProperties[cProperty],cPath+"."+cProperty)
+                                    endif
+                                    exit
+                                case "string"
+                                    if (hb_HHasKey(hProperties[cProperty],"pattern"))
+                                        self:CheckPattern(hData[cProperty],hProperties[cProperty]["pattern"],cPath+"."+cProperty)
+                                    endif
+                                    exit
+                                case "object"
+                                    self:ValidateObject(hData[cProperty],hProperties[cProperty],cPath+"."+cProperty)
+                                    exit
+                            end switch
+                        endif
                     endif
                 endif
             next each //cProperty
@@ -165,50 +180,70 @@ method CheckArray(aValue as array,hSchema as hash,cPath as character) class JSON
     if (hb_HHasKey(hSchema,"minItems"))
         if (nItems<hSchema["minItems"])
             lValid:=.F.
-            aAdd(self:aErrors,"Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+",Minimum: "+hb_NToC(hSchema["minItems"]))
+            aAdd(self:aErrors,"Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
         endif
     endif
 
     if (hb_HHasKey(hSchema,"maxItems"))
         if (nItems>hSchema["maxItems"])
             lValid:=.F.
-            aAdd(self:aErrors,"Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+",Maximum: "+hb_NToC(hSchema["maxItems"]))
+            aAdd(self:aErrors,"Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
         endif
     endif
 
     return(lValid)
 
-method CheckType(xValue as anytype,cType as character,cPath as character) class JSONValidator
+method CheckEnum(xValue as anytype,aEnum as array,cPath as character) class JSONValidator
+    local lValid as logical:=(hb_JSONEncode(xValue)$hb_JSONEncode(aEnum))
+    if (!lValid)
+        aAdd(self:aErrors,"Invalid enum value at "+cPath+". Value: "+LTrim(hb_ValToStr(xValue))+", Allowed values: "+__ArrayToString(aEnum))
+    endif
+    return(lValid)
 
+method CheckType(xValue as anytype,xType as anytype,cPath as character) class JSONValidator
+
+    local cType as character
     local cValueType as character:=ValType(xValue)
 
     local lResult as logical:=.F.
 
-    hb_Default(@cPath,"root")
-
-    switch Lower(cType)
-        case "string"
-            lResult:=(cValueType=="C")
-            exit
-        case "number"
-            lResult:=(cValueType=="N")
-            exit
-        case "boolean"
-            lResult:=(cValueType=="L")
-            exit
-        case "object"
-            lResult:=(cValueType=="H")
-            exit
-        case "array"
-            lResult:=(cValueType=="A")
-            exit
-        case "null"
-            lResult:=(cValueType=="U")
-            exit
-    end switch
-
-    if (!lResult)
-        aAdd(self:aErrors,"Type mismatch at "+cPath+". Expected: "+cType+",Found: "+__HB2JSON(cValueType))
+    cType:=ValType(xType)
+    if (cType=="C")
+        // Tipo único
+        cType:=xType
+        switch Lower(cType)
+            case "string"
+                lResult:=(cValueType=="C")
+                exit
+            case "number"
+                lResult:=(cValueType=="N")
+                exit
+            case "boolean"
+                lResult:=(cValueType=="L")
+                exit
+            case "object"
+                lResult:=(cValueType=="H")
+                exit
+            case "array"
+                lResult:=(cValueType=="A")
+                exit
+            case "null"
+                lResult:=(cValueType=="U")
+                exit
+        end switch
+        if (!lResult)
+            aAdd(self:aErrors,"Type mismatch at "+cPath+". Expected: "+cType+", Found: "+__HB2JSON(cValueType))
+        endif
+    elseif (cType=="A")
+        // Array de tipos
+        lResult:=(__HB2JSON(cValueType)$hb_JSONEncode(xType))
+        if (!lResult)
+            aAdd(self:aErrors, "Type mismatch at "+cPath+". Expected: one of: "+__ArrayToString(xType)+", Found: "+__HB2JSON(cValueType))
+        endif
+    else
+        // Tipo inválido para cType
+        aAdd(self:aErrors, "Invalid type specification at "+cPath+". Expected string or array of strings, Got "+__HB2JSON(cType))
+        lResult:=.F.
     endif
 
 return lResult
@@ -294,3 +329,14 @@ static function __regexMatch(cString as character,cPattern as character)
     lMatch:=(!Empty(aMatch))
 
     return(lMatch)
+
+static function __ArrayToString(aArray as array)
+    local cResult as character:=""
+    local nElement as numeric
+    for nElement:=1 to Len(aArray)
+        if (nElement>1)
+            cResult+= ", "
+        endif
+        cResult+=LTrim(hb_ValToStr(aArray[nElement]))
+    next nElement
+    return(cResult)
