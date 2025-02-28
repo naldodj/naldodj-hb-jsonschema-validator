@@ -1,6 +1,6 @@
 # tests
 
-###JSON Schema
+### JSON Schema
 ```json
 {
     "type": "object",
@@ -41,7 +41,7 @@
 }
 ```
 ---
-###Valid
+### Valid
 ```xBase
 procedure Main()
 
@@ -184,7 +184,7 @@ procedure Main()
 
     return
 ```
-#Result
+### Result
 ```
 === Test 1: Valid case: all fields correct ===
 Result: Valid JSON!
