@@ -194,9 +194,11 @@ method CheckArray(aValue as array,hSchema as hash,cPath as character) class JSON
     return(lValid)
 
 method CheckEnum(xValue as anytype,aEnum as array,cPath as character) class JSONValidator
-    local lValid as logical:=(hb_JSONEncode(xValue)$hb_JSONEncode(aEnum))
+    local cValue as character:=hb_JSONEncode(xValue)
+    local cEnums as character:=hb_JSONEncode(aEnum)
+    local lValid as logical:=(cValue$cEnums)
     if (!lValid)
-        aAdd(self:aErrors,"Invalid enum value at "+cPath+". Value: "+LTrim(hb_ValToStr(xValue))+", Allowed values: "+__ArrayToString(aEnum))
+        aAdd(self:aErrors,"Invalid enum value at "+cPath+". Value: "+cValue+", Allowed values: "+cEnums)
     endif
     return(lValid)
 
@@ -236,9 +238,11 @@ method CheckType(xValue as anytype,xType as anytype,cPath as character) class JS
         endif
     elseif (cType=="A")
         // Array de tipos
-        lResult:=(__HB2JSON(cValueType)$hb_JSONEncode(xType))
+        cType:=hb_JSONEncode(xType)
+        cValueType:=__HB2JSON(cValueType)
+        lResult:=(cValueType$cType)
         if (!lResult)
-            aAdd(self:aErrors, "Type mismatch at "+cPath+". Expected: one of: "+__ArrayToString(xType)+", Found: "+__HB2JSON(cValueType))
+            aAdd(self:aErrors, "Type mismatch at "+cPath+". Expected: one of: "+cType+", Found: "+cValueType)
         endif
     else
         // Tipo inválido para cType
@@ -329,14 +333,3 @@ static function __regexMatch(cString as character,cPattern as character)
     lMatch:=(!Empty(aMatch))
 
     return(lMatch)
-
-static function __ArrayToString(aArray as array)
-    local cResult as character:=""
-    local nElement as numeric
-    for nElement:=1 to Len(aArray)
-        if (nElement>1)
-            cResult+= ", "
-        endif
-        cResult+=LTrim(hb_ValToStr(aArray[nElement]))
-    next nElement
-    return(cResult)
