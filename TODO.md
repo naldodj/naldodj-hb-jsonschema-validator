@@ -12,7 +12,26 @@
 
 ### In Progress
 
-- [ ] ...
+- [ ] "type": ["array"](https://json-schema.org/understanding-json-schema/reference/array)
+    - [ ] "uniqueItems"
+    - [ ] "minContains"
+    - [ ] "maxContains"
+- [ ] "type": ["number"](https://json-schema.org/understanding-json-schema/reference/numeric)
+    - [ ] "range"
+        - [ ] x ≥ "minimum"
+        - [ ] x ≤ "maximum"
+        - [ ] x > "exclusiveMinimum"
+        - [ ] x < "exclusiveMaximum"
+    - [ ] "Multiples"
+        - [ ] "multipleOf"
+- [ ] "type": ["string"](https://json-schema.org/understanding-json-schema/reference/string)
+    - [ ] "Length"
+        - [ ] "minLength"
+        - [ ] "maxLength"
+
+- [ ] "type": ["object"](https://json-schema.org/understanding-json-schema/reference/object)
+- [ ] "type": ["boolean"](https://json-schema.org/understanding-json-schema/reference/boolean)
+- [ ] "type": ["boolean"](https://json-schema.org/understanding-json-schema/reference/boolean)
 
 ### Done ✓
 
