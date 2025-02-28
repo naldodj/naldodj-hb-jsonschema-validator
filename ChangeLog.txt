@@ -3,6 +3,12 @@
    Entries may not always be in chronological/commit order.
    See license at the end of file. */
 
+2025-02-28 14:10 UTC naldodj (New Features)
+  * src/tst/json_validator_tst.exe
+  * src/core/json_validator.prg
+  * src/tst/hbmk.hbm
+  * src/tst/json_validator_tst.prg
+
 2025-02-28 08:28 UTC naldodj (initial commit)
   + bin/3rdpatch.hb
   + bin/check.hb

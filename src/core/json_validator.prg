@@ -16,15 +16,26 @@
 class JSONValidator
 
     data aErrors as array
+
+    data cSchema as character
+
     data hSchema as hash
     data hJSONData as hash
+
     data lHasError as logical
 
     method New(cSchema as character) constructor
-    method SetSchema(cSchema as character) as logical
-    method Validate(cJSONData as character) as logical
-    method CheckType(xValue as anytype,cType as character,cPath as character) as logical
+
+    method CheckArray(aValue as array,hSchema as hash,cPath as character) as logical
+    method CheckPattern(cValue as character,cPattern as character,cPath as character) as logical
     method CheckRequired(hData as hash,aRequired as array,cPath as character) as logical
+    method CheckType(xValue as anytype,cType as character,cPath as character) as logical
+
+    method Reset(cSchema as character) as logical
+
+    method SetSchema(cSchema as character) as logical
+
+    method Validate(cJSONData as character) as logical
     method ValidateObject(hData as hash,hSchema as hash,cPath as character) as logical
 
 endclass
@@ -33,135 +44,216 @@ method New(cSchema as character) class JSONValidator
     self:aErrors:={}
     self:lHasError:=(!self:SetSchema(cSchema))
     if (self:lHasError)
-        aAdd(self:aErrors,"Invalid JSON schema")
+        aAdd(self:aErrors,"Invalid JSON schema provided")
     endif
-return(self)
+    return(self)
+
+method Reset(cSchema as character) class JSONValidator
+    hb_default(@cSchema,self:cSchema)
+return(self:SetSchema(cSchema))
 
 method SetSchema(cSchema as character) class JSONValidator
     aSize(self:aErrors,0)
-    self:hSchema:=hb_JSONDecode(cSchema)
+    self:cSchema:=cSchema
+    self:hSchema:=hb_JSONDecode(self:cSchema)
     self:lHasError:=(ValType(self:hSchema)!="H")
-return(!self:lHasError)
+return (!self:lHasError)
 
 method Validate(cJSONData as character) class JSONValidator
-
     begin sequence
         self:hJSONData:=hb_JSONDecode(cJSONData)
         if (self:hJSONData==NIL)
-            aAdd(self:aErrors,"Invalid JSON data")
+            aAdd(self:aErrors,"Invalid JSON data provided")
             break
         endif
         self:ValidateObject(self:hJSONData,self:hSchema,"root")
     end sequence
-
     self:lHasError:=(!Empty(self:aErrors))
-
-return(!self:lHasError)
+    return (!self:lHasError)
 
 method ValidateObject(hData as hash,hSchema as hash,cPath as character) class JSONValidator
 
     local aRequired as array
+
     local cType as character
     local cProperty as character
+
     local hProperties as hash
+
     local lValid as logical
 
-    // Define o valor padrão como "root" se não for fornecido
     hb_Default(@cPath,"root")
 
     begin sequence
-
-        // Verifica se o schema tem uma definição de tipo
         if (hb_HHasKey(hSchema,"type"))
             cType:=hSchema["type"]
             lValid:=self:CheckType(hData,cType,cPath)
             if (!lValid)
                 break
             endif
+            switch Lower(cType)
+                case "array"
+                    if (hb_HHasKey(hSchema,"items"))
+                        lValid:=self:CheckArray(hData,hSchema,cPath)
+                        if (!lValid)
+                            break
+                        endif
+                    endif
+                    exit
+                case "string"
+                    if (hb_HHasKey(hSchema,"pattern"))
+                        lValid:=self:CheckPattern(hData,hSchema["pattern"],cPath)
+                        if (!lValid)
+                            break
+                        endif
+                    endif
+                    exit
+            end switch
         endif
 
-        // Verifica propriedades obrigatórias
         if (hb_HHasKey(hSchema,"required"))
             aRequired:=hSchema["required"]
             self:CheckRequired(hData,aRequired,cPath)
         endif
 
-        // Valida propriedades do objeto
-        if ((hb_HHasKey(hSchema,"properties")).and.(ValType(hData)=="H"))
+        if (hb_HHasKey(hSchema,"properties") .and.(ValType(hData)=="H"))
             hProperties:=hSchema["properties"]
             for each cProperty in hb_HKeys(hProperties)
                 if (hb_HHasKey(hData,cProperty))
                     if (hb_HHasKey(hProperties[cProperty],"type"))
-                        self:CheckType(hData[cProperty],hProperties[cProperty]["type"],cPath+"."+cProperty)
-                    endif
-                    // Validação recursiva para objetos aninhados
-                    if (hProperties[cProperty]["type"]=="object")
-                        self:ValidateObject(hData[cProperty],hProperties[cProperty],cPath+"."+cProperty)
+                        cType:=hProperties[cProperty]["type"]
+                        self:CheckType(hData[cProperty],cType,cPath+"."+cProperty)
+                        switch Lower(cType)
+                            case "array"
+                                if (hb_HHasKey(hProperties[cProperty],"items"))
+                                    self:CheckArray(hData[cProperty],hProperties[cProperty],cPath+"."+cProperty)
+                                endif
+                                exit
+                            case "string"
+                                if (hb_HHasKey(hProperties[cProperty],"pattern"))
+                                    self:CheckPattern(hData[cProperty],hProperties[cProperty]["pattern"],cPath+"."+cProperty)
+                                endif
+                                exit
+                            case "object"
+                                self:ValidateObject(hData[cProperty],hProperties[cProperty],cPath+"."+cProperty)
+                                exit
+                        end switch
                     endif
                 endif
-            next each
+            next each //cProperty
         endif
     end sequence
 
     self:lHasError:=(!Empty(self:aErrors))
 
-return(!self:lHasError)
+    return (!self:lHasError)
+
+method CheckArray(aValue as array,hSchema as hash,cPath as character) class JSONValidator
+
+    local lValid as logical:=.T.
+    local nItem as numeric
+    local nItems as numeric:=Len(aValue)
+
+    hb_Default(@cPath,"root")
+
+    for nItem:=1 to nItems
+        if (!self:ValidateObject(aValue[nItem],hSchema["items"],cPath+".item("+hb_NToC(nItem)+")"))
+            lValid:=.F.
+        endif
+    next
+
+    if (hb_HHasKey(hSchema,"minItems"))
+        if (nItems<hSchema["minItems"])
+            lValid:=.F.
+            aAdd(self:aErrors,"Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+",Minimum: "+hb_NToC(hSchema["minItems"]))
+        endif
+    endif
+
+    if (hb_HHasKey(hSchema,"maxItems"))
+        if (nItems>hSchema["maxItems"])
+            lValid:=.F.
+            aAdd(self:aErrors,"Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+",Maximum: "+hb_NToC(hSchema["maxItems"]))
+        endif
+    endif
+
+    return(lValid)
 
 method CheckType(xValue as anytype,cType as character,cPath as character) class JSONValidator
 
     local cValueType as character:=ValType(xValue)
+
     local lResult as logical:=.F.
+
+    hb_Default(@cPath,"root")
 
     switch Lower(cType)
         case "string"
-            lResult:=cValueType=="C"
+            lResult:=(cValueType=="C")
             exit
         case "number"
-            lResult:=cValueType=="N"
+            lResult:=(cValueType=="N")
             exit
         case "boolean"
-            lResult:=cValueType=="L"
+            lResult:=(cValueType=="L")
             exit
         case "object"
-            lResult:=cValueType=="H"
+            lResult:=(cValueType=="H")
             exit
         case "array"
-            lResult:=cValueType=="A"
+            lResult:=(cValueType=="A")
             exit
         case "null"
-            lResult:=cValueType=="U"
+            lResult:=(cValueType=="U")
             exit
     end switch
 
     if (!lResult)
-        aAdd(self:aErrors,"Invalid type for property: "+cPath+". Expected: "+cType+", Assigned: "+__HB2JSON(cValueType))
+        aAdd(self:aErrors,"Type mismatch at "+cPath+". Expected: "+cType+",Found: "+__HB2JSON(cValueType))
     endif
 
-return(lResult)
+return lResult
+
+method CheckPattern(cValue as character,cPattern as character,cPath as character) class JSONValidator
+
+    local lValid as logical
+
+    hb_Default(@cPath,"root")
+
+    lValid:=__regexMatch(cValue,cPattern)
+    if (!lValid)
+        aAdd(self:aErrors,"Pattern mismatch at "+cPath+". Value: '"+cValue+"' does not match pattern: '"+cPattern+"'")
+    endif
+
+    return(lValid)
 
 method CheckRequired(hData as hash,aRequired as array,cPath as character) class JSONValidator
 
     local cProperty as character
-    local lValid as logical
+
+    local lValid as logical:=.T.
+
     local nProperty as numeric
 
+    hb_Default(@cPath,"root")
+
     begin sequence
-        lValid:=(ValType(hData)=="H")
-        if (!lValid)
-            aAdd(self:aErrors,"Data at "+cPath+" must be an object to check required properties")
+
+        if (ValType(hData)!="H")
+            aAdd(self:aErrors,"Expected an object at "+cPath+" to check required properties")
+            lValid:=.F.
             break
         endif
 
         for nProperty:=1 to Len(aRequired)
             cProperty:=aRequired[nProperty]
             if (!hb_HHasKey(hData,cProperty))
-                aAdd(self:aErrors,"Missing required property: "+cPath+"."+cProperty)
+                aAdd(self:aErrors,"Required property missing at "+cPath+"."+cProperty)
                 lValid:=.F.
             endif
         next
     end sequence
 
-return(lValid)
+    return(lValid)
 
 static function __HB2JSON(cType as character)
     local cResult as character
@@ -185,6 +277,20 @@ static function __HB2JSON(cType as character)
             cResult:="null"
             exit
         otherwise
-            cResult:="undefined type"
+            cResult:="unknown"
     end switch
-return(cResult)
+
+    return(cResult)
+
+static function __regexMatch(cString as character,cPattern as character)
+
+    local aMatch as array
+
+    local lMatch as logical
+
+    local pRegex as pointer:=hb_regexComp(cPattern,.T./* case-sensitive */,.F./* no multiline */)
+
+    aMatch:=hb_regex(pRegex,cString,.T./* case-sensitive */)
+    lMatch:=(!Empty(aMatch))
+
+    return(lMatch)
