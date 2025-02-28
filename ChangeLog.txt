@@ -3,6 +3,9 @@
    Entries may not always be in chronological/commit order.
    See license at the end of file. */
 
+2025-02-28 14:23 UTC naldodj (add src/tst/README.md)
+  + src/tst/README.md
+
 2025-02-28 14:10 UTC naldodj (New Features)
   * src/tst/json_validator_tst.exe
   * src/core/json_validator.prg
