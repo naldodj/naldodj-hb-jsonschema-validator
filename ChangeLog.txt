@@ -3,7 +3,7 @@
    Entries may not always be in chronological/commit order.
    See license at the end of file. */
 
-2025-02-28 08:27 UTC naldodj (initial commit)
+2025-02-28 08:28 UTC naldodj (initial commit)
   + bin/3rdpatch.hb
   + bin/check.hb
   + bin/findnoasciicharacters.ps1
@@ -34,4 +34,6 @@
   + bin/commit.hb
   + src/core/json_validator.prg
   + src/tst/json_validator_tst.prg
+  + .gitattributes
+  + .gitignore
   * LICENSE
