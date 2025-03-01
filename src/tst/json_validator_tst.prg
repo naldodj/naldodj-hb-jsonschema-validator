@@ -20,6 +20,8 @@ procedure Main()
 
     local oJSONValidator as object
 
+    CLS
+
     hb_cdpSelect("UTF8")
     hb_cdpSelect("UTF8EX")
 
@@ -165,13 +167,16 @@ procedure Main()
         SetColor("") /* Reset color to default */
 
         cJSON:=aTests[nTest][2]
-
         lValid:=oJSONValidator:Validate(cJSON)
 
         if (lValid)
+            SetColor("g+/n")
             QOut("Result: Valid JSON!")
+            SetColor("")
         else
+            SetColor("r+/n")
             QOut("Result: Invalid JSON. Errors found:")
+            SetColor("")
             aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
         endif
 
@@ -179,9 +184,13 @@ procedure Main()
 
         // Verify expected outcome
         if (lValid==aTests[nTest][3])
+            SetColor("g+/n")
             QOut("Test passed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
+            SetColor("")
         else
+            SetColor("r+/n")
             QOut("Test failed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
+            SetColor("")
         endif
 
         QOut("")
@@ -233,12 +242,17 @@ procedure Main()
         QOut("=== Test "+hb_NToC(nTest)+": "+aTests[nTest][1]+" ===")
         SetColor("") /* Reset color to default */
 
+        cJSON:=aTests[nTest][2]
         lValid:=oJSONValidator:Validate(cJSON)
 
         if (lValid)
+            SetColor("g+/n")
             QOut("Result: Valid JSON!")
+            SetColor("")
         else
+            SetColor("r+/n")
             QOut("Result: Invalid JSON. Errors found:")
+            SetColor("")
             aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
         endif
 
@@ -246,9 +260,13 @@ procedure Main()
 
         // Verify expected outcome
         if (lValid==aTests[nTest][3])
+            SetColor("g+/n")
             QOut("Test passed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
+            SetColor("")
         else
+            SetColor("r+/n")
             QOut("Test failed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
+            SetColor("")
         endif
 
         QOut("")
