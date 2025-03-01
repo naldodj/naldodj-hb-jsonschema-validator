@@ -1,5 +1,5 @@
 /*
-    Example usage with valid and invalid test cases
+    Example usage with valid and invalid test cases.
 
     Released to Public Domain.
     --------------------------------------------------------------------------------------
@@ -69,13 +69,14 @@ procedure Main()
                 "pattern": "^product-"
             },
             "minContains": 1,
-            "maxContains": 3
+            "maxContains": 3,
+            "uniqueItems": true
         }
     }
 }
     #pragma __endtext
 
-    // Array of test cases: {description,JSON data,expected validity}
+    // Array of test cases: {description, JSON data, expected validity}
     aTests:={;
         {;//1
              "Test 1 => Valid case: all fields correct";
@@ -142,6 +143,16 @@ procedure Main()
             ,'{"name": "Eve","age": 22,"tags": ["product-a", "product-b", "other"]}';
             ,.T.;
         };
+        ,{;//19
+             "Test 19 => Valid case: unique tags";
+            ,'{"name": "John","age": 30,"tags": ["product-123", "other"]}';
+            ,.T.;
+        };
+        ,{;//19
+             "Test 19 => Invalid case: duplicate tags";
+            ,'{"name": "Alice","age": 25,"tags": ["product-123", "product-123"]}';
+            ,.F.;
+        };
     }
 
     oJSONValidator:=JSONValidator():New(cSchema)
@@ -149,7 +160,10 @@ procedure Main()
     // Run each test case
     for nTest:=1 to Len(aTests)
 
+        SetColor("BR/W+")
         QOut("=== Test "+hb_NToC(nTest)+": "+aTests[nTest][1]+" ===")
+        SetColor("") /* Reset color to default */
+
         cJSON:=aTests[nTest][2]
 
         lValid:=oJSONValidator:Validate(cJSON)
@@ -202,12 +216,12 @@ procedure Main()
 
     // Array of test cases: Enum
     aTests:={;
-         {"Test 19 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": "ativo"}',.T.};
-        ,{"Test 20 => Fruta inválida",'{"fruta": "laranja", "numero": 2, "opcao": "sim", "status": "ativo"}',.F.};
-        ,{"Test 21 => Número inválido",'{"fruta": "banana", "numero": 4, "opcao": "sim", "status": "ativo"}',.F.};
-        ,{"Test 22 => Opção inválida",'{"fruta": "banana", "numero": 3, "opcao": "tim", "status": "ativo"}',.F.};
-        ,{"Test 23 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": null}',.T.};
-        ,{"Test 24 => Todos Inválidos",'{"fruta": "melância", "numero": 9, "opcao": "nao", "status": "em espera"}',.F.};
+         {"Test 20 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": "ativo"}',.T.};
+        ,{"Test 21 => Fruta inválida",'{"fruta": "laranja", "numero": 2, "opcao": "sim", "status": "ativo"}',.F.};
+        ,{"Test 22 => Número inválido",'{"fruta": "banana", "numero": 4, "opcao": "sim", "status": "ativo"}',.F.};
+        ,{"Test 23 => Opção inválida",'{"fruta": "banana", "numero": 3, "opcao": "tim", "status": "ativo"}',.F.};
+        ,{"Test 24 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": null}',.T.};
+        ,{"Test 25 => Todos Inválidos",'{"fruta": "melância", "numero": 9, "opcao": "nao", "status": "em espera"}',.F.};
     }
 
     oJSONValidator:Reset(cSchema)
@@ -215,8 +229,9 @@ procedure Main()
     // Run each test case
     for nTest:=1 to Len(aTests)
 
-        QOut("=== Test Enum("+hb_NToC(nTest)+"): "+aTests[nTest][1]+" ===")
-        cJSON:=aTests[nTest][2]
+        SetColor("W+/BR")
+        QOut("=== Test "+hb_NToC(nTest)+": "+aTests[nTest][1]+" ===")
+        SetColor("") /* Reset color to default */
 
         lValid:=oJSONValidator:Validate(cJSON)
 
