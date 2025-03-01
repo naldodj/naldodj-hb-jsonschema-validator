@@ -190,11 +190,17 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
     local lOnlyCheck:=self:lOnlyCheck
     local lUniqueItems as logical:=(hb_HHasKey(hSchema,"uniqueItems").and.hSchema["uniqueItems"])
 
+    local hUniqueItems as hash
+
     local nItem as numeric
     local nItems as numeric:=Len(aValues)
     local nContainsCount as numeric:=0
 
     hb_Default(@cPath,"root")
+
+    if (lUniqueItems)
+        hUniqueItems:={=>}
+    endif
 
     for nItem:=1 to nItems
         cItemPath:=(cPath+".item("+hb_NToC(nItem)+")")
@@ -209,7 +215,17 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
             self:lOnlyCheck:=lOnlyCheck
         endif
         if ((lUniqueItems).and.(lValid))
-            if (aScan(aValues,{|x|hb_JSONEncode(x)==hb_JSONEncode(aValues[nItem])},nItem+1)!=0)
+            if (;
+                aScan(;
+                     aValues;
+                    ,{|x,y|;
+                        if(hb_HHasKey(hUniqueItems,y),hUniqueItems[y],hb_HSet(hUniqueItems,y,hb_JSONEncode(x))[y]);
+                        ==;
+                        if(hb_HHasKey(hUniqueItems,nItem),hUniqueItems[nItem],hb_HSet(hUniqueItems,nItem,hb_JSONEncode(aValues[nItem]))[nItem]);
+                    };
+                    ,nItem+1;
+                )!=0;
+            )
                 lValid:=.F.
                 self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
             endif

@@ -107,7 +107,7 @@ procedure Main()
         };
         ,{;//6
              "Test 6 => Invalid case: 'tags' above maxItems";
-            ,'{"name": "Frank","age": 35,"tags": ["a","b","c","d","e","f","g","h","i","j","k"]}';
+            ,'{"name": "Frank","age": 35,"tags": ["product-000","product-001","product-002","product-003","product-004","product-005","product-006","product-007","product-008","product-009","product-010"]}';
             ,.F.;
         };
         ,{;//7
@@ -125,34 +125,34 @@ procedure Main()
             ,'{"name": "Ivy","age": 33,"tags": ["test"],"address": "not an object"}';
             ,.F.;
         };
-        ,{;//15
-             "Test 15 => Valid case: at least one tag satisfies 'contains'";
+        ,{;//10
+             "Test 10 => Valid case: at least one tag satisfies 'contains'";
             ,'{"name": "John","age": 30,"tags": ["product-123", "other"]}';
             ,.T.;
         };
-        ,{;//16
-             "Test 16 => Invalid case: no tags satisfy 'contains'";
+        ,{;//11
+             "Test 11 => Invalid case: no tags satisfy 'contains'";
             ,'{"name": "Alice","age": 25,"tags": ["other", "another"]}';
             ,.F.;
         };
-        ,{;//17
-             "Test 17 => Invalid case: too many tags satisfy 'contains'";
+        ,{;//12
+             "Test 12 => Invalid case: too many tags satisfy 'contains'";
             ,'{"name": "Bob","age": 40,"tags": ["product-1", "product-2", "product-3", "product-4"]}';
             ,.F.;
         };
-        ,{;//18
-             "Test 18 => Valid case: exactly 2 tags satisfy 'contains'";
+        ,{;//13
+             "Test 13 => Valid case: exactly 2 tags satisfy 'contains'";
             ,'{"name": "Eve","age": 22,"tags": ["product-a", "product-b", "other"]}';
             ,.T.;
         };
-        ,{;//19
-             "Test 19 => Valid case: unique tags";
+        ,{;//14
+             "Test 14 => Valid case: unique tags";
             ,'{"name": "John","age": 30,"tags": ["product-123", "other"]}';
             ,.T.;
         };
-        ,{;//19
-             "Test 19 => Invalid case: duplicate tags";
-            ,'{"name": "Alice","age": 25,"tags": ["product-123", "product-123"]}';
+        ,{;//15
+             "Test 15 => Invalid case: duplicate tags";
+            ,'{"name": "Alice","age": 25,"tags": ["product-123", "product-132","product-123","product-132","product-123"]}';
             ,.F.;
         };
     }
@@ -225,12 +225,12 @@ procedure Main()
 
     // Array of test cases: Enum
     aTests:={;
-         {"Test 20 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": "ativo"}',.T.};
-        ,{"Test 21 => Fruta inválida",'{"fruta": "laranja", "numero": 2, "opcao": "sim", "status": "ativo"}',.F.};
-        ,{"Test 22 => Número inválido",'{"fruta": "banana", "numero": 4, "opcao": "sim", "status": "ativo"}',.F.};
-        ,{"Test 23 => Opção inválida",'{"fruta": "banana", "numero": 3, "opcao": "tim", "status": "ativo"}',.F.};
-        ,{"Test 24 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": null}',.T.};
-        ,{"Test 25 => Todos Inválidos",'{"fruta": "melância", "numero": 9, "opcao": "nao", "status": "em espera"}',.F.};
+         {"Test 16 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": "ativo"}',.T.};
+        ,{"Test 17 => Fruta inválida",'{"fruta": "laranja", "numero": 2, "opcao": "sim", "status": "ativo"}',.F.};
+        ,{"Test 18 => Número inválido",'{"fruta": "banana", "numero": 4, "opcao": "sim", "status": "ativo"}',.F.};
+        ,{"Test 19 => Opção inválida",'{"fruta": "banana", "numero": 3, "opcao": "tim", "status": "ativo"}',.F.};
+        ,{"Test 20 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": null}',.T.};
+        ,{"Test 21 => Todos Inválidos",'{"fruta": "melância", "numero": 9, "opcao": "nao", "status": "em espera"}',.F.};
     }
 
     oJSONValidator:Reset(cSchema)
