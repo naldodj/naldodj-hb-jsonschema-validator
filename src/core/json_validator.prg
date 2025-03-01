@@ -86,6 +86,7 @@ method ValidateObject(hData as hash,hSchema as hash,cPath as character) class JS
 
     local cType as character
     local cProperty as character
+    local cPropertyPath as character
 
     local hProperties as hash
 
@@ -133,31 +134,32 @@ method ValidateObject(hData as hash,hSchema as hash,cPath as character) class JS
             self:CheckRequired(hData,aRequired,cPath)
         endif
 
-        if (hb_HHasKey(hSchema,"properties") .and.(ValType(hData)=="H"))
+        if (hb_HHasKey(hSchema,"properties").and.(ValType(hData)=="H"))
             hProperties:=hSchema["properties"]
             for each cProperty in hb_HKeys(hProperties)
                 if (hb_HHasKey(hData,cProperty))
+                    cPropertyPath:=(cPath+"."+cProperty)
                     if (hb_HHasKey(hProperties[cProperty],"type"))
                         xType:=hProperties[cProperty]["type"]
-                        self:CheckType(hData[cProperty],xType,cPath+"."+cProperty)
+                        self:CheckType(hData[cProperty],xType,cPropertyPath)
                         if (hb_HHasKey(hProperties[cProperty],"enum"))
-                            self:CheckEnum(hData[cProperty],hProperties[cProperty]["enum"],cPath+"."+cProperty)
+                            self:CheckEnum(hData[cProperty],hProperties[cProperty]["enum"],cPropertyPath)
                         endif
                         if (valtype(xType)=="C")
                             cType:=xType
                             switch Lower(cType)
                                 case "array"
                                     if (hb_HHasKey(hProperties[cProperty],"items"))
-                                        self:CheckArray(hData[cProperty],hProperties[cProperty],cPath+"."+cProperty)
+                                        self:CheckArray(hData[cProperty],hProperties[cProperty],cPropertyPath)
                                     endif
                                     exit
                                 case "string"
                                     if (hb_HHasKey(hProperties[cProperty],"pattern"))
-                                        self:CheckPattern(hData[cProperty],hProperties[cProperty]["pattern"],cPath+"."+cProperty)
+                                        self:CheckPattern(hData[cProperty],hProperties[cProperty]["pattern"],cPropertyPath)
                                     endif
                                     exit
                                 case "object"
-                                    self:ValidateObject(hData[cProperty],hProperties[cProperty],cPath+"."+cProperty)
+                                    self:ValidateObject(hData[cProperty],hProperties[cProperty],cPropertyPath)
                                     exit
                             end switch
                         endif
@@ -195,7 +197,7 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
     hb_Default(@cPath,"root")
 
     for nItem:=1 to nItems
-        cItemPath:=cPath+".item("+hb_NToC(nItem)+")"
+        cItemPath:=(cPath+".item("+hb_NToC(nItem)+")")
         if (!self:ValidateObject(aValues[nItem],hSchema["items"],cItemPath))
             lValid:=.F.
         endif
@@ -332,16 +334,16 @@ method CheckRequired(hData as hash,aRequired as array,cPath as character) class 
     begin sequence
 
         if (ValType(hData)!="H")
-            self:AddError("Expected an object at "+cPath+" to check required properties")
             lValid:=.F.
+            self:AddError("Expected an object at "+cPath+" to check required properties")
             break
         endif
 
         for nProperty:=1 to Len(aRequired)
             cProperty:=aRequired[nProperty]
             if (!hb_HHasKey(hData,cProperty))
-                self:AddError("Required property missing at "+cPath+"."+cProperty)
                 lValid:=.F.
+                self:AddError("Required property missing at "+cPath+"."+cProperty)
             endif
         next
 
