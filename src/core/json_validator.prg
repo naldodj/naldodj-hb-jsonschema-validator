@@ -16,6 +16,7 @@
 class JSONValidator
 
     data aErrors as array
+    data aOnlyCheck as array
 
     data cSchema as character
 
@@ -23,10 +24,13 @@ class JSONValidator
     data hJSONData as hash
 
     data lHasError as logical
+    data lOnlyCheck as logical
 
     method New(cSchema as character) constructor
 
-    method CheckArray(aValue as array,hSchema as hash,cPath as character) as logical
+    method AddError(cError)
+
+    method CheckArray(aValues as array,hSchema as hash,cPath as character) as logical
     method CheckEnum(xValue as anytype,aEnum as array,cPath as character) as logical
     method CheckPattern(cValue as character,cPattern as character,cPath as character) as logical
     method CheckRequired(hData as hash,aRequired as array,cPath as character) as logical
@@ -43,9 +47,11 @@ endclass
 
 method New(cSchema as character) class JSONValidator
     self:aErrors:={}
+    self:aOnlyCheck:={}
     self:lHasError:=(!self:SetSchema(cSchema))
+    self:lOnlyCheck:=.F.
     if (self:lHasError)
-        aAdd(self:aErrors,"Invalid JSON schema provided")
+        self:AddError("Invalid JSON schema provided")
     endif
     return(self)
 
@@ -55,8 +61,10 @@ return(self:SetSchema(cSchema))
 
 method SetSchema(cSchema as character) class JSONValidator
     aSize(self:aErrors,0)
+    aSize(self:aOnlyCheck,0)
     self:cSchema:=cSchema
     self:hSchema:=hb_JSONDecode(self:cSchema)
+    self:lOnlyCheck:=.F.
     self:lHasError:=(ValType(self:hSchema)!="H")
 return (!self:lHasError)
 
@@ -64,7 +72,7 @@ method Validate(cJSONData as character) class JSONValidator
     begin sequence
         self:hJSONData:=hb_JSONDecode(cJSONData)
         if (self:hJSONData==NIL)
-            aAdd(self:aErrors,"Invalid JSON data provided")
+            self:AddError("Invalid JSON data provided")
             break
         endif
         self:ValidateObject(self:hJSONData,self:hSchema,"root")
@@ -163,31 +171,77 @@ method ValidateObject(hData as hash,hSchema as hash,cPath as character) class JS
 
     return (!self:lHasError)
 
-method CheckArray(aValue as array,hSchema as hash,cPath as character) class JSONValidator
+method procedure AddError(cError) class JSONValidator
+    if (!self:lOnlyCheck)
+        aAdd(self:aErrors,cError)
+    else
+        aAdd(self:aOnlyCheck,cError)
+    endif
+    return
+
+method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSONValidator
+
+    local cItemPath as character
 
     local lValid as logical:=.T.
+    local lContains as logical:=hb_HHasKey(hSchema,"contains")
+    local lOnlyCheck:=self:lOnlyCheck
+    local lUniqueItems as logical:=(hb_HHasKey(hSchema,"uniqueItems").and.hSchema["uniqueItems"])
+
     local nItem as numeric
-    local nItems as numeric:=Len(aValue)
+    local nItems as numeric:=Len(aValues)
+    local nContainsCount as numeric:=0
 
     hb_Default(@cPath,"root")
 
     for nItem:=1 to nItems
-        if (!self:ValidateObject(aValue[nItem],hSchema["items"],cPath+".item("+hb_NToC(nItem)+")"))
+        cItemPath:=cPath+".item("+hb_NToC(nItem)+")"
+        if (!self:ValidateObject(aValues[nItem],hSchema["items"],cItemPath))
             lValid:=.F.
         endif
-    next
+        if (lContains)
+            self:lOnlyCheck:=.T.
+            if (self:ValidateObject(aValues[nItem],hSchema["contains"],cItemPath))
+                nContainsCount++
+            endif
+            self:lOnlyCheck:=lOnlyCheck
+        endif
+        if ((lUniqueItems).and.(lValid))
+            if (aScan(aValues,{|x|hb_JSONEncode(x)==hb_JSONEncode(aValues[nItem])},nItem+1)!=0)
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
+            endif
+        endif
+    next nItem
+
+    if (lContains)
+        // Additional checks after iteration
+        nContainsCount:=Max(nContainsCount-=Len(self:aOnlyCheck),0)
+        aSize(self:aOnlyCheck,0)
+        if ((hb_HHasKey(hSchema,"minContains").and.(nContainsCount<hSchema["minContains"])))
+            lValid:=.F.
+            self:AddError("Array at "+cPath+" has too few items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+        elseif (nContainsCount<1)  // Default: at least 1 item
+            lValid:=.F.
+            self:AddError("Array at "+cPath+" does not contain at least one item satisfying 'contains'.")
+        endif
+        if (hb_HHasKey(hSchema,"maxContains").and.(nContainsCount>hSchema["maxContains"]))
+            lValid:=.F.
+            self:AddError("Array at "+cPath+" has too many items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+        endif
+    endif
 
     if (hb_HHasKey(hSchema,"minItems"))
         if (nItems<hSchema["minItems"])
             lValid:=.F.
-            aAdd(self:aErrors,"Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
+            self:AddError("Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
         endif
     endif
 
     if (hb_HHasKey(hSchema,"maxItems"))
         if (nItems>hSchema["maxItems"])
             lValid:=.F.
-            aAdd(self:aErrors,"Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
+            self:AddError("Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
         endif
     endif
 
@@ -198,7 +252,7 @@ method CheckEnum(xValue as anytype,aEnum as array,cPath as character) class JSON
     local cEnums as character:=hb_JSONEncode(aEnum)
     local lValid as logical:=(cValue$cEnums)
     if (!lValid)
-        aAdd(self:aErrors,"Invalid enum value at "+cPath+". Value: "+cValue+", Allowed values: "+cEnums)
+        self:AddError("Invalid enum value at "+cPath+". Value: "+cValue+", Allowed values: "+cEnums)
     endif
     return(lValid)
 
@@ -234,7 +288,7 @@ method CheckType(xValue as anytype,xType as anytype,cPath as character) class JS
                 exit
         end switch
         if (!lResult)
-            aAdd(self:aErrors,"Type mismatch at "+cPath+". Expected: "+cType+", Found: "+__HB2JSON(cValueType))
+            self:AddError("Type mismatch at "+cPath+". Expected: "+cType+", Found: "+__HB2JSON(cValueType))
         endif
     elseif (cType=="A")
         // Array de tipos
@@ -242,11 +296,11 @@ method CheckType(xValue as anytype,xType as anytype,cPath as character) class JS
         cValueType:=__HB2JSON(cValueType)
         lResult:=(cValueType$cType)
         if (!lResult)
-            aAdd(self:aErrors, "Type mismatch at "+cPath+". Expected: one of: "+cType+", Found: "+cValueType)
+            self:AddError( "Type mismatch at "+cPath+". Expected: one of: "+cType+", Found: "+cValueType)
         endif
     else
         // Tipo inválido para cType
-        aAdd(self:aErrors, "Invalid type specification at "+cPath+". Expected string or array of strings, Got "+__HB2JSON(cType))
+        self:AddError( "Invalid type specification at "+cPath+". Expected string or array of strings, Got "+__HB2JSON(cType))
         lResult:=.F.
     endif
 
@@ -260,7 +314,7 @@ method CheckPattern(cValue as character,cPattern as character,cPath as character
 
     lValid:=__regexMatch(cValue,cPattern)
     if (!lValid)
-        aAdd(self:aErrors,"Pattern mismatch at "+cPath+". Value: '"+cValue+"' does not match pattern: '"+cPattern+"'")
+        self:AddError("Pattern mismatch at "+cPath+". Value: '"+cValue+"' does not match pattern: '"+cPattern+"'")
     endif
 
     return(lValid)
@@ -278,7 +332,7 @@ method CheckRequired(hData as hash,aRequired as array,cPath as character) class 
     begin sequence
 
         if (ValType(hData)!="H")
-            aAdd(self:aErrors,"Expected an object at "+cPath+" to check required properties")
+            self:AddError("Expected an object at "+cPath+" to check required properties")
             lValid:=.F.
             break
         endif
@@ -286,7 +340,7 @@ method CheckRequired(hData as hash,aRequired as array,cPath as character) class 
         for nProperty:=1 to Len(aRequired)
             cProperty:=aRequired[nProperty]
             if (!hb_HHasKey(hData,cProperty))
-                aAdd(self:aErrors,"Required property missing at "+cPath+"."+cProperty)
+                self:AddError("Required property missing at "+cPath+"."+cProperty)
                 lValid:=.F.
             endif
         next

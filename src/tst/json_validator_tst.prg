@@ -11,8 +11,8 @@ procedure Main()
 
     local aTests as array
 
-    local cSchema as character
     local cJSON as character
+    local cSchema as character
 
     local lValid as logical
 
@@ -63,7 +63,13 @@ procedure Main()
                 "type": "string"
             },
             "minItems": 1,
-            "maxItems": 10
+            "maxItems": 10,
+            "contains": {
+                "type": "string",
+                "pattern": "^product-"
+            },
+            "minContains": 1,
+            "maxContains": 3
         }
     }
 }
@@ -72,49 +78,69 @@ procedure Main()
     // Array of test cases: {description,JSON data,expected validity}
     aTests:={;
         {;//1
-             "Teste 1 => Valid case: all fields correct";
-            ,'{"name": "John","age": 30,"tags": ["product"],"address": {"city": "New York","zip": "12345-678"}}';
+             "Test 1 => Valid case: all fields correct";
+            ,'{"name": "John","age": 30,"tags": ["product-123"],"address": {"city": "New York","zip": "12345-678"}}';
             ,.T.;
         };
         ,{;//2
-             "Teste 2 =>Invalid case: missing required 'name'";
+             "Test 2 => Invalid case: missing required 'name'";
             ,'{"age": 25,"tags": ["test"]}';
             ,.F.;
         };
         ,{;//3
-             "Teste 3 =>Invalid case: wrong type for 'age'";
+             "Test 3 => Invalid case: wrong type for 'age'";
             ,'{"name": "Alice","age": "thirty","tags": ["demo"]}';
             ,.F.;
         };
         ,{;//4
-             "Teste 4 => Invalid case: 'tags' with wrong item type";
+             "Test 4 => Invalid case: 'tags' with wrong item type";
             ,'{"name": "Bob","age": 40,"tags": ["tag1",123]}';
             ,.F.;
         };
         ,{;//5
-             "Teste 5 => Invalid case: 'tags' below minItems";
+             "Test 5 => Invalid case: 'tags' below minItems";
             ,'{"name": "Eve","age": 22,"tags": []}';
             ,.F.;
         };
         ,{;//6
-             "Teste 6 => Invalid case: 'tags' above maxItems";
+             "Test 6 => Invalid case: 'tags' above maxItems";
             ,'{"name": "Frank","age": 35,"tags": ["a","b","c","d","e","f","g","h","i","j","k"]}';
             ,.F.;
         };
         ,{;//7
-             "Teste 7 => Invalid case: invalid 'zip' pattern";
+             "Test 7 => Invalid case: invalid 'zip' pattern";
             ,'{"name": "Grace","age": 28,"tags": ["valid"],"address": {"city": "LA","zip": "1234-567"}}';
             ,.F.;
         };
         ,{;//8
-             "Teste 8 => Valid case: minimal valid data";
-            ,'{"name": "Hank","age": 50,"tags": ["simple"]}';
+             "Test 8 => Valid case: minimal valid data";
+            ,'{"name": "Hank","age": 50,"tags": ["product-123"]}';
             ,.T.;
         };
         ,{;//9
-             "Teste 9 => Invalid case: 'address' with wrong type";
+             "Test 9 => Invalid case: 'address' with wrong type";
             ,'{"name": "Ivy","age": 33,"tags": ["test"],"address": "not an object"}';
             ,.F.;
+        };
+        ,{;//15
+             "Test 15 => Valid case: at least one tag satisfies 'contains'";
+            ,'{"name": "John","age": 30,"tags": ["product-123", "other"]}';
+            ,.T.;
+        };
+        ,{;//16
+             "Test 16 => Invalid case: no tags satisfy 'contains'";
+            ,'{"name": "Alice","age": 25,"tags": ["other", "another"]}';
+            ,.F.;
+        };
+        ,{;//17
+             "Test 17 => Invalid case: too many tags satisfy 'contains'";
+            ,'{"name": "Bob","age": 40,"tags": ["product-1", "product-2", "product-3", "product-4"]}';
+            ,.F.;
+        };
+        ,{;//18
+             "Test 18 => Valid case: exactly 2 tags satisfy 'contains'";
+            ,'{"name": "Eve","age": 22,"tags": ["product-a", "product-b", "other"]}';
+            ,.T.;
         };
     }
 
@@ -176,12 +202,12 @@ procedure Main()
 
     // Array of test cases: Enum
     aTests:={;
-         {"Teste 10 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": "ativo"}',.T.};
-        ,{"Teste 11 => Fruta inválida",'{"fruta": "laranja", "numero": 2, "opcao": "sim", "status": "ativo"}',.F.};
-        ,{"Teste 12 => Número inválido",'{"fruta": "banana", "numero": 4, "opcao": "sim", "status": "ativo"}',.F.};
-        ,{"Teste 12 => Opção inválida",'{"fruta": "banana", "numero": 3, "opcao": "tim", "status": "ativo"}',.F.};
-        ,{"Teste 13 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": null}',.T.};
-        ,{"Teste 14 => Todos Inválidos",'{"fruta": "melância", "numero": 9, "opcao": "nao", "status": "em espera"}',.F.};
+         {"Test 19 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": "ativo"}',.T.};
+        ,{"Test 20 => Fruta inválida",'{"fruta": "laranja", "numero": 2, "opcao": "sim", "status": "ativo"}',.F.};
+        ,{"Test 21 => Número inválido",'{"fruta": "banana", "numero": 4, "opcao": "sim", "status": "ativo"}',.F.};
+        ,{"Test 22 => Opção inválida",'{"fruta": "banana", "numero": 3, "opcao": "tim", "status": "ativo"}',.F.};
+        ,{"Test 23 => Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": null}',.T.};
+        ,{"Test 24 => Todos Inválidos",'{"fruta": "melância", "numero": 9, "opcao": "nao", "status": "em espera"}',.F.};
     }
 
     oJSONValidator:Reset(cSchema)

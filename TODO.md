@@ -13,9 +13,10 @@
 ### In Progress
 
 - [ ] "type": ["array"](https://json-schema.org/understanding-json-schema/reference/array)
-    - [ ] "uniqueItems"
-    - [ ] "minContains"
-    - [ ] "maxContains"
+    - [x] "uniqueItems"
+    - [x] "minContains"
+    - [x] "maxContains"
+    - [ ] "tupleValidation"
 - [ ] "type": ["number"](https://json-schema.org/understanding-json-schema/reference/numeric)
     - [ ] "range"
         - [ ] x ≥ "minimum"
