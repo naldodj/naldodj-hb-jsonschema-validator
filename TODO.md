@@ -17,14 +17,6 @@
     - [x] "minContains"
     - [x] "maxContains"
     - [ ] "tupleValidation"
-- [ ] "type": ["number"](https://json-schema.org/understanding-json-schema/reference/numeric)
-    - [ ] "range"
-        - [ ] x ≥ "minimum"
-        - [ ] x ≤ "maximum"
-        - [ ] x > "exclusiveMinimum"
-        - [ ] x < "exclusiveMaximum"
-    - [ ] "Multiples"
-        - [ ] "multipleOf"
 - [ ] "type": ["string"](https://json-schema.org/understanding-json-schema/reference/string)
     - [ ] "Length"
         - [ ] "minLength"
@@ -35,4 +27,14 @@
 
 ### Done ✓
 
-- [x] Create my first TODO.md
+- [x] "type": ["number"](https://json-schema.org/understanding-json-schema/reference/numeric)
+    - [x] "range"
+        - [x] x ≥ "minimum"
+        - [x] x ≤ "maximum"
+        - [x] x > "exclusiveMinimum"
+        - [x] x < "exclusiveMaximum"
+    - [x] "Multiples"
+        - [x] "multipleOf"
+    - [x] "types"
+        - [x] "integer"
+        - [x] "number"
