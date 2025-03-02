@@ -102,7 +102,7 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
                 endif
                 self:lOnlyCheck:=lOnlyCheck
             endif
-            if ((lUniqueItems).and.(lValid))
+            if (lUniqueItems)
                 if (;
                     aScan(;
                          aValues;
@@ -115,10 +115,11 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
                     )!=0;
                 )
                     lValid:=.F.
-                    self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
                     if (self:lFastMode)
+                        self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
                         break
                     endif
+                    self:AddError("Array at "+cPath+".Item("+hb_NToC(nItem)+") contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
                 endif
             endif
         next nItem
