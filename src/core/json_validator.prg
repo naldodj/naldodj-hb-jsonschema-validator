@@ -23,6 +23,7 @@ class JSONValidator
     data hSchema as hash
     data hJSONData as hash
 
+    data lFastMode as logical
     data lHasError as logical
     data lOnlyCheck as logical
 
@@ -35,6 +36,7 @@ class JSONValidator
     method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) as logical
     method CheckPattern(cValue as character,cPattern as character,cPath as character) as logical
     method CheckRequired(hData as hash,aRequired as array,cPath as character) as logical
+    method CheckString(cValue as numeric,hSchema as hash,cPath as character) as logical
     method CheckType(xValue as anytype,xType as anytype,cPath as character) as logical
 
     method Reset(cSchema as character) as logical
@@ -49,11 +51,9 @@ endclass
 method New(cSchema as character) class JSONValidator
     self:aErrors:={}
     self:aOnlyCheck:={}
-    self:lHasError:=(!self:SetSchema(cSchema))
+    self:lFastMode:=.T.
     self:lOnlyCheck:=.F.
-    if (self:lHasError)
-        self:AddError("Invalid JSON schema provided")
-    endif
+    self:SetSchema(cSchema)
     return(self)
 
 method procedure AddError(cError) class JSONValidator
@@ -85,66 +85,91 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
         hUniqueItems:={=>}
     endif
 
-    for nItem:=1 to nItems
-        cItemPath:=(cPath+".item("+hb_NToC(nItem)+")")
-        if (!self:ValidateObject(aValues[nItem],hSchema["items"],cItemPath))
-            lValid:=.F.
-        endif
-        if (lContains)
-            self:lOnlyCheck:=.T.
-            if (self:ValidateObject(aValues[nItem],hSchema["contains"],cItemPath))
-                nContainsCount++
-            endif
-            self:lOnlyCheck:=lOnlyCheck
-        endif
-        if ((lUniqueItems).and.(lValid))
-            if (;
-                aScan(;
-                     aValues;
-                    ,{|x,y|;
-                        if(hb_HHasKey(hUniqueItems,y),hUniqueItems[y],hb_HSet(hUniqueItems,y,hb_JSONEncode(x))[y]);
-                        ==;
-                        if(hb_HHasKey(hUniqueItems,nItem),hUniqueItems[nItem],hb_HSet(hUniqueItems,nItem,hb_JSONEncode(aValues[nItem]))[nItem]);
-                    };
-                    ,nItem+1;
-                )!=0;
-            )
+    begin sequence
+
+        for nItem:=1 to nItems
+            cItemPath:=(cPath+".item("+hb_NToC(nItem)+")")
+            if (!self:ValidateObject(aValues[nItem],hSchema["items"],cItemPath))
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+            if (lContains)
+                self:lOnlyCheck:=.T.
+                if (self:ValidateObject(aValues[nItem],hSchema["contains"],cItemPath))
+                    nContainsCount++
+                endif
+                self:lOnlyCheck:=lOnlyCheck
+            endif
+            if ((lUniqueItems).and.(lValid))
+                if (;
+                    aScan(;
+                         aValues;
+                        ,{|x,y|;
+                            if(hb_HHasKey(hUniqueItems,y),hUniqueItems[y],hb_HSet(hUniqueItems,y,hb_JSONEncode(x))[y]);
+                            ==;
+                            if(hb_HHasKey(hUniqueItems,nItem),hUniqueItems[nItem],hb_HSet(hUniqueItems,nItem,hb_JSONEncode(aValues[nItem]))[nItem]);
+                        };
+                        ,nItem+1;
+                    )!=0;
+                )
+                    lValid:=.F.
+                    self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
+                    if (self:lFastMode)
+                        break
+                    endif
+                endif
+            endif
+        next nItem
+
+        if (lContains)
+            // Additional checks after iteration
+            nContainsCount:=Max(nContainsCount-=Len(self:aOnlyCheck),0)
+            aSize(self:aOnlyCheck,0)
+            if ((hb_HHasKey(hSchema,"minContains").and.(nContainsCount<hSchema["minContains"])))
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" has too few items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+                if (self:lFastMode)
+                    break
+                endif
+            elseif (nContainsCount<1)  // Default: at least 1 item
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" does not contain at least one item satisfying 'contains'.")
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+            if (hb_HHasKey(hSchema,"maxContains").and.(nContainsCount>hSchema["maxContains"]))
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" has too many items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+                if (self:lFastMode)
+                    break
+                endif
             endif
         endif
-    next nItem
 
-    if (lContains)
-        // Additional checks after iteration
-        nContainsCount:=Max(nContainsCount-=Len(self:aOnlyCheck),0)
-        aSize(self:aOnlyCheck,0)
-        if ((hb_HHasKey(hSchema,"minContains").and.(nContainsCount<hSchema["minContains"])))
-            lValid:=.F.
-            self:AddError("Array at "+cPath+" has too few items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
-        elseif (nContainsCount<1)  // Default: at least 1 item
-            lValid:=.F.
-            self:AddError("Array at "+cPath+" does not contain at least one item satisfying 'contains'.")
+        if (hb_HHasKey(hSchema,"minItems"))
+            if (nItems<hSchema["minItems"])
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
         endif
-        if (hb_HHasKey(hSchema,"maxContains").and.(nContainsCount>hSchema["maxContains"]))
-            lValid:=.F.
-            self:AddError("Array at "+cPath+" has too many items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
-        endif
-    endif
 
-    if (hb_HHasKey(hSchema,"minItems"))
-        if (nItems<hSchema["minItems"])
-            lValid:=.F.
-            self:AddError("Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
+        if (hb_HHasKey(hSchema,"maxItems"))
+            if (nItems>hSchema["maxItems"])
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
         endif
-    endif
 
-    if (hb_HHasKey(hSchema,"maxItems"))
-        if (nItems>hSchema["maxItems"])
-            lValid:=.F.
-            self:AddError("Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
-        endif
-    endif
+    end sequence
 
     return(lValid)
 
@@ -165,59 +190,84 @@ method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) class J
 
     local nTempN as numeric
 
-    // Check the basic type
-    if (cType=="integer")
-        nTempN:=Int(nValue)
-        lValid:=((nValue-nTempN)==0)
-        if (!lValid)
-            self:AddError("Type mismatch at " + cPath + ". Expected: " + cType + ", Found: number")
-        endif
-    elseif ((cType!="number").and.(cType!="integer"))
-        lValid:=.F.
-        self:AddError("Type mismatch at "+cPath+". Expected: "+cType+", Found: number")
-    endif
+    begin sequence
 
-    // Check multipleOf, if present
-    if ((lValid).and.(hb_HHasKey(hSchema,"multipleOf")))
-        nTempN:=(nValue/hSchema["multipleOf"])
-        // Check if the result is 'almost' integer (tolerance for floating-point errors)
-        lValid:=(Abs(nTempN-Round(nTempN,0))<0.0000001)  // epsilon = 1e-7
-        if (!lValid)
-            self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is not a multiple of "+hb_JSONEncode(hSchema["multipleOf"]))
-        endif
-    endif
-
-    // Check minimum, if present
-    if ((lValid).and.(hb_HHasKey(hSchema,"minimum")))
-        if (nValue < hSchema["minimum"])
+        // Check the basic type
+        if (cType=="integer")
+            nTempN:=Int(nValue)
+            lValid:=((nValue-nTempN)==0)
+            if (!lValid)
+                self:AddError("Type mismatch at " + cPath + ". Expected: " + cType + ", Found: number")
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        elseif ((cType!="number").and.(cType!="integer"))
             lValid:=.F.
-            self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is smaller than minimum: "+hb_JSONEncode(hSchema["minimum"]))
+            self:AddError("Type mismatch at "+cPath+". Expected: "+cType+", Found: number")
+            if (self:lFastMode)
+                break
+            endif
         endif
-    endif
 
-    // Check maximum, if present
-    if ((lValid).and.(hb_HHasKey(hSchema,"maximum")))
-        if (nValue > hSchema["maximum"])
-            lValid:=.F.
-            self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is bigger than maximum: "+hb_JSONEncode(hSchema["maximum"]))
+        // Check multipleOf, if present
+        if (hb_HHasKey(hSchema,"multipleOf"))
+            nTempN:=(nValue/hSchema["multipleOf"])
+            // Check if the result is 'almost' integer (tolerance for floating-point errors)
+            lValid:=(Abs(nTempN-Round(nTempN,0))<0.0000001)  // epsilon = 1e-7
+            if (!lValid)
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is not a multiple of "+hb_JSONEncode(hSchema["multipleOf"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
         endif
-    endif
 
-    // Check exclusiveMinimum, if present
-    if ((lValid).and.(hb_HHasKey(hSchema,"exclusiveMinimum")))
-        if (nValue<=hSchema["exclusiveMinimum"])
-            lValid:=.F.
-            self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is smaller than or equal to exclusiveMinimum: "+hb_JSONEncode(hSchema["exclusiveMinimum"]))
+        // Check minimum, if present
+        if (hb_HHasKey(hSchema,"minimum"))
+            if (nValue<hSchema["minimum"])
+                lValid:=.F.
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is smaller than minimum: "+hb_JSONEncode(hSchema["minimum"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
         endif
-    endif
 
-    // Check exclusiveMaximum, if present
-    if ((lValid).and.(hb_HHasKey(hSchema,"exclusiveMaximum")))
-        if (nValue>=hSchema["exclusiveMaximum"])
-            lValid:=.F.
-            self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is bigger than or equal to exclusiveMaximum: "+hb_JSONEncode(hSchema["exclusiveMaximum"]))
+        // Check maximum, if present
+        if (hb_HHasKey(hSchema,"maximum"))
+            if (nValue>hSchema["maximum"])
+                lValid:=.F.
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is bigger than maximum: "+hb_JSONEncode(hSchema["maximum"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
         endif
-    endif
+
+        // Check exclusiveMinimum, if present
+        if (hb_HHasKey(hSchema,"exclusiveMinimum"))
+            if (nValue<=hSchema["exclusiveMinimum"])
+                lValid:=.F.
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is smaller than or equal to exclusiveMinimum: "+hb_JSONEncode(hSchema["exclusiveMinimum"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        endif
+
+        // Check exclusiveMaximum, if present
+        if (hb_HHasKey(hSchema,"exclusiveMaximum"))
+            if (nValue>=hSchema["exclusiveMaximum"])
+                lValid:=.F.
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is bigger than or equal to exclusiveMaximum: "+hb_JSONEncode(hSchema["exclusiveMaximum"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        endif
+
+    end sequence
 
     return(lValid)
 
@@ -257,8 +307,50 @@ method CheckRequired(hData as hash,aRequired as array,cPath as character) class 
             if (!hb_HHasKey(hData,cProperty))
                 lValid:=.F.
                 self:AddError("Required property missing at "+cPath+"."+cProperty)
+                if (self:lFastMode)
+                    break
+                endif
             endif
         next
+
+    end sequence
+
+    return(lValid)
+
+method CheckString(cValue as numeric,hSchema as hash,cPath as character) class JSONValidator
+
+    local lValid as logical:=.T.
+
+    local nLen as numeric:=Len(cValue)
+
+    begin sequence
+
+        // Check minLength, if present
+        if (hb_HHasKey(hSchema,"minLength"))
+            if (nLen<hSchema["minLength"])
+                lValid:=.F.
+                self:AddError("Lenght ("+hb_NToC(nLen)+") of string "+hb_JSONEncode(cValue)+" at "+cPath+" is smaller than minLength: "+hb_JSONEncode(hSchema["minLength"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        endif
+
+        // Check maxLength, if present
+        if (hb_HHasKey(hSchema,"maxLength"))
+            if (nLen>hSchema["maxLength"])
+                lValid:=.F.
+                self:AddError("Lenght ("+hb_NToC(nLen)+") of string "+hb_JSONEncode(cValue)+" at "+cPath+" is bigger than maxLength: "+hb_JSONEncode(hSchema["maxLength"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        endif
+
+        // Check pattern, if present
+        if (hb_HHasKey(hSchema,"pattern"))
+            lValid:=self:CheckPattern(cValue,hSchema["pattern"],cPath)
+        endif
 
     end sequence
 
@@ -320,18 +412,23 @@ method Reset(cSchema as character) class JSONValidator
 return(self:SetSchema(cSchema))
 
 method SetSchema(cSchema as character) class JSONValidator
+    local nLengthDecoded as numeric
     aSize(self:aErrors,0)
     aSize(self:aOnlyCheck,0)
     self:cSchema:=cSchema
-    self:hSchema:=hb_JSONDecode(self:cSchema)
     self:lOnlyCheck:=.F.
-    self:lHasError:=(ValType(self:hSchema)!="H")
+    nLengthDecoded:=hb_JSONDecode(self:cSchema,@self:hSchema)
+    self:lHasError:=((nLengthDecoded==0).or.ValType(self:hSchema)!="H")
+    if (self:lHasError)
+        self:AddError("Invalid JSON Schema provided")
+    endif
 return (!self:lHasError)
 
 method Validate(cJSONData as character) class JSONValidator
+    local nLengthDecoded as numeric
     begin sequence
-        self:hJSONData:=hb_JSONDecode(cJSONData)
-        if (self:hJSONData==NIL)
+        nLengthDecoded:=hb_JSONDecode(cJSONData,@self:hJSONData)
+        if (((nLengthDecoded==0).or.ValType(self:hJSONData)!="H"))
             self:AddError("Invalid JSON data provided")
             break
         endif
@@ -376,19 +473,29 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
             switch Lower(cType)
                 case "array"
                     if (hb_HHasKey(hSchema,"items"))
-                        self:CheckArray(xData,hSchema,cPath)
+                        if (self:CheckArray(xData,hSchema,cPath))
+                            if (self:lFastMode)
+                                break
+                            endif
+                        endif
                     endif
                     exit
                 case "string"
-                    if (hb_HHasKey(hSchema,"pattern"))
-                        self:CheckPattern(xData,hSchema["pattern"],cPath)
+                    if (!self:CheckString(xData,hSchema,cPath))
+                        if (self:lFastMode)
+                            break
+                        endif
                     endif
                     exit
                 case "object"
                     exit
                 case "integer"
                 case "number"
-                    self:CheckNumber(xData,hSchema,cPath)
+                    if (!self:CheckNumber(xData,hSchema,cPath))
+                        if (self:lFastMode)
+                            break
+                        endif
+                    endif
                     exit
             end switch
         endif
@@ -400,46 +507,76 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
 
         if (hb_HHasKey(hSchema,"required"))
             aRequired:=hSchema["required"]
-            self:CheckRequired(xData,aRequired,cPath)
+            if (!self:CheckRequired(xData,aRequired,cPath))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
         endif
 
-        if (hb_HHasKey(hSchema,"properties"))
-            hProperties:=hSchema["properties"]
-            for each cProperty in hb_HKeys(hProperties)
-                if (hb_HHasKey(xData,cProperty))
-                    cPropertyPath:=(cPath+"."+cProperty)
-                    if (hb_HHasKey(hProperties[cProperty],"type"))
-                        xType:=hProperties[cProperty]["type"]
-                        self:CheckType(xData[cProperty],xType,cPropertyPath)
-                        if (hb_HHasKey(hProperties[cProperty],"enum"))
-                            self:CheckEnum(xData[cProperty],hProperties[cProperty]["enum"],cPropertyPath)
+        if (!hb_HHasKey(hSchema,"properties"))
+            break
+        endif
+
+        hProperties:=hSchema["properties"]
+        for each cProperty in hb_HKeys(hProperties)
+            if (hb_HHasKey(xData,cProperty))
+                cPropertyPath:=(cPath+"."+cProperty)
+                if (hb_HHasKey(hProperties[cProperty],"type"))
+                    xType:=hProperties[cProperty]["type"]
+                    lValid:=self:CheckType(xData[cProperty],xType,cPropertyPath)
+                    if (!lValid)
+                        if (self:lFastMode)
+                            break
                         endif
-                        if (valtype(xType)=="C")
-                            cType:=xType
-                            switch Lower(cType)
-                                case "array"
-                                    if (hb_HHasKey(hProperties[cProperty],"items"))
-                                        self:CheckArray(xData[cProperty],hProperties[cProperty],cPropertyPath)
-                                    endif
-                                    exit
-                                case "string"
-                                    if (hb_HHasKey(hProperties[cProperty],"pattern"))
-                                        self:CheckPattern(xData[cProperty],hProperties[cProperty]["pattern"],cPropertyPath)
-                                    endif
-                                    exit
-                                case "object"
-                                    self:ValidateObject(xData[cProperty],hProperties[cProperty],cPropertyPath)
-                                    exit
-                                case "integer"
-                                case "number"
-                                    self:CheckNumber(xData[cProperty],hProperties[cProperty],cPropertyPath)
-                                    exit
-                            end switch
+                        loop
+                    endif
+                    if (hb_HHasKey(hProperties[cProperty],"enum"))
+                        if (!self:CheckEnum(xData[cProperty],hProperties[cProperty]["enum"],cPropertyPath))
+                            if (self:lFastMode)
+                                break
+                            endif
                         endif
                     endif
+                    if (valtype(xType)=="C")
+                        cType:=xType
+                        switch Lower(cType)
+                            case "array"
+                                if (hb_HHasKey(hProperties[cProperty],"items"))
+                                    if (!self:CheckArray(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                        if (self:lFastMode)
+                                            break
+                                        endif
+                                    endif
+                                endif
+                                exit
+                            case "string"
+                                if (!self:CheckString(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                    if (self:lFastMode)
+                                        break
+                                    endif
+                                endif
+                                exit
+                            case "object"
+                                if (!self:ValidateObject(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                    if (self:lFastMode)
+                                        break
+                                    endif
+                                endif
+                                exit
+                            case "integer"
+                            case "number"
+                                if (!self:CheckNumber(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                    if (self:lFastMode)
+                                        break
+                                    endif
+                                endif
+                                exit
+                        end switch
+                    endif
                 endif
-            next each //cProperty
-        endif
+            endif
+        next each //cProperty
 
     end sequence
 
