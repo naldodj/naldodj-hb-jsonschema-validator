@@ -33,6 +33,8 @@
     - [ ] "prefixItems"
 - [ ] "type": ["object"](https://json-schema.org/understanding-json-schema/reference/object)
 - [ ] "type": ["boolean"](https://json-schema.org/understanding-json-schema/reference/boolean)
+- [ ] "$ref"
+- [ ] "$defs"
 
 ### Done ✔
 
