@@ -9,6 +9,10 @@
 - [ ] Suporte a Referências ($ref): Implementar a resolução de referências para permitir a reutilização de schemas e a validação de estruturas mais complexas.
 - [ ] Mensagens de Erro Detalhadas: Melhorar as mensagens de erro para fornecer feedback mais claro e específico sobre falhas de validação.
 - [ ] Testes Abrangentes: Desenvolver uma suíte de testes abrangente para garantir a precisão e a robustez do validador em diversos cenários
+- [ ] **Suporte a Referências (`$ref`):** Implementar a resolução de referências para permitir a reutilização de schemas e a validação de estruturas mais complexas.
+- [ ] **Validações de Objetos:** Incluir suporte para `patternProperties` e `additionalProperties` para validar a estrutura e o conteúdo de objetos JSON.
+- [ ] **Combinações Lógicas:** Implementar as palavras-chave `allOf`, `anyOf` e `oneOf` para validações condicionais.
+- [ ] **Suporte a Definições (`$defs`):** Adicionar suporte para o uso de definições reutilizáveis dentro dos schemas.
 
 ### In Progress ⏳
 
