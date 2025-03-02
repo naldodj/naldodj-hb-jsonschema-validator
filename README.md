@@ -2,6 +2,8 @@
 
 Este projeto é um validador de JSON Schema para a linguagem Harbour, permitindo que desenvolvedores validem dados JSON conforme esquemas definidos, garantindo a integridade e conformidade dos dados em aplicações Harbour.
 
+![image](https://github.com/user-attachments/assets/552c954c-8e9a-48e9-afeb-0fd806742de6)
+
 ## Funcionalidades Atuais
 
 - **Validação de Tipos Básicos:** Suporte para `string`, `number`, `integer`, `boolean`, `object`, `array` e `null`.
