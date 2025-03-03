@@ -18,8 +18,9 @@
 
 - [ ] "type": ["array"](https://json-schema.org/understanding-json-schema/reference/array)
     - [x] "items"
-    - [ ] "tupleValidation"
-        - [ ] "prefixItems"
+    - [x] "tupleValidation"
+        - [x] "prefixItems"
+        - [x] "items"
     - [ ] "unevaluatedItems"
         - [ ] "items"
         - [ ] "prefixItems"
@@ -34,7 +35,7 @@
     - [ ] "allOf"
     - [ ] "anyOf"
     - [ ] "oneOf" 
-    - [ ] "prefixItems"
+    - [x] "prefixItems"
 - [ ] "type": ["object"](https://json-schema.org/understanding-json-schema/reference/object)
 - [ ] "type": ["boolean"](https://json-schema.org/understanding-json-schema/reference/boolean)
 - [ ] "$ref"

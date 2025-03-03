@@ -21,18 +21,20 @@ class JSONValidator
     data cSchema as character
 
     data hSchema as hash
-    data hJSONData as hash
     data hRegexMatch as hash
 
     data lFastMode as logical
     data lHasError as logical
     data lOnlyCheck as logical
 
+    data xJSONData as hash,array
+
     method New(cSchema as character) constructor
 
     method AddError(cError)
 
-    method CheckArray(aValues as array,hSchema as hash,cPath as character) as logical
+    method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) as logical
+    method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character) as logical
     method CheckEnum(xValue as anytype,aEnum as array,cPath as character) as logical
     method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) as logical
     method CheckPattern(cValue as character,cPattern as character,cPath as character) as logical
@@ -66,7 +68,7 @@ method procedure AddError(cError) class JSONValidator
     endif
     return
 
-method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSONValidator
+method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) class JSONValidator
 
     local cItemPath as character
 
@@ -127,6 +129,146 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
                 endif
             endif
         next nItem
+
+        if (lContains)
+            // Additional checks after iteration
+            nContainsCount:=Max(nContainsCount-=Len(self:aOnlyCheck),0)
+            aSize(self:aOnlyCheck,0)
+            if ((hb_HHasKey(hSchema,"minContains").and.(nContainsCount<hSchema["minContains"])))
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" has too few items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+                if (self:lFastMode)
+                    break
+                endif
+            elseif (nContainsCount<1)  // Default: at least 1 item
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" does not contain at least one item satisfying 'contains'.")
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+            if (hb_HHasKey(hSchema,"maxContains").and.(nContainsCount>hSchema["maxContains"]))
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" has too many items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        endif
+
+        if (hb_HHasKey(hSchema,"minItems"))
+            if (nItems<hSchema["minItems"])
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        endif
+
+        if (hb_HHasKey(hSchema,"maxItems"))
+            if (nItems>hSchema["maxItems"])
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        endif
+
+    end sequence
+
+    return(lValid)
+
+method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character) class JSONValidator
+
+    local aPrefixItems as array:=hSchema["prefixItems"]
+    local aAdditionalValues as array
+
+    local cItemPath as character
+    local cItemType as character
+
+    local lValid as logical:=.T.
+    local lContains as logical:=hb_HHasKey(hSchema,"contains")
+    local lOnlyCheck:=self:lOnlyCheck
+    local lUniqueItems as logical:=(hb_HHasKey(hSchema,"uniqueItems").and.hSchema["uniqueItems"])
+
+    local hUniqueItems as hash
+
+    local nItem as numeric
+    local nItems as numeric:=Len(aValues)
+    local nPrefixItems as numeric:=Len(aPrefixItems)
+    local nItemNext as numeric
+    local nContainsCount as numeric:=0
+    local nAdditionalValues as numeric
+
+    hb_Default(@cPath,"root")
+
+    if (lUniqueItems)
+        hUniqueItems:={=>}
+    endif
+
+    begin sequence
+
+        for nItem:=1 to Min(nItems,nPrefixItems)
+            cItemPath:=(cPath+".item("+hb_NToC(nItem)+")")
+            if (!self:ValidateObject(aValues[nItem],aPrefixItems[nItem],cItemPath))
+                lValid:=.F.
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+            if (lContains)
+                self:lOnlyCheck:=.T.
+                if (self:ValidateObject(aValues[nItem],hSchema["contains"],cItemPath))
+                    nContainsCount++
+                endif
+                self:lOnlyCheck:=lOnlyCheck
+            endif
+            if (lUniqueItems)
+                nItemNext:=nItem+1
+                if (;
+                    aScan(;
+                         aValues;
+                        ,{|x,y|;
+                            if(hb_HHasKey(hUniqueItems,y),hUniqueItems[y],hb_HSet(hUniqueItems,y,hb_Serialize(x))[y]);
+                            ==;
+                            if(hb_HHasKey(hUniqueItems,nItem),hUniqueItems[nItem],hb_HSet(hUniqueItems,nItem,hb_Serialize(aValues[nItem]))[nItem]);
+                        };
+                        ,nItemNext;
+                    )!=0;
+                )
+                    lValid:=.F.
+                    if (self:lFastMode)
+                        self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
+                        break
+                    endif
+                    self:AddError("Array at "+cPath+".Item("+hb_NToC(nItem)+") contains duplicate item: ("+hb_JSONEncode(aValues[nItem])+"). All items must be unique as per schema 'uniqueItems' requirement.")
+                endif
+            endif
+        next nItem
+
+        //Additional Items
+        if ((nItems>nPrefixItems).and.(hb_HHasKey(hSchema,"items")))
+            cItemType:=valType(hSchema["items"])
+            //Length of Additional Items
+            nAdditionalValues:=(nItems-nPrefixItems)
+            if ((cItemType=="L").and.(!hSchema["items"]))
+                lValid:=.F.
+                self:AddError("Array at "+cPath+" does not allow additional items. Extra items found: "+hb_NToC(nAdditionalValues))
+                if (self:lFastMode)
+                    break
+                endif
+            elseif (cItemType=="H")
+                //Additional Items
+                aAdditionalValues:=aCopy(aValues,Array(nAdditionalValues),(nPrefixItems+1),nAdditionalValues)
+                if (!self:CheckArrayItems(aAdditionalValues,hSchema,cPath))
+                    if (self:lFastMode)
+                        break
+                    endif
+                endif
+            endif
+        endif
 
         if (lContains)
             // Additional checks after iteration
@@ -436,12 +578,12 @@ return (!self:lHasError)
 method Validate(cJSONData as character) class JSONValidator
     local nLengthDecoded as numeric
     begin sequence
-        nLengthDecoded:=hb_JSONDecode(cJSONData,@self:hJSONData)
-        if (((nLengthDecoded==0).or.ValType(self:hJSONData)!="H"))
+        nLengthDecoded:=hb_JSONDecode(cJSONData,@self:xJSONData)
+        if (((nLengthDecoded==0).or.(!ValType(self:xJSONData)$"A|H")))
             self:AddError("Invalid JSON data provided")
             break
         endif
-        self:ValidateObject(self:hJSONData,self:hSchema,"root")
+        self:ValidateObject(self:xJSONData,self:hSchema,"root")
     end sequence
     self:lHasError:=(!Empty(self:aErrors))
     return (!self:lHasError)
@@ -481,8 +623,14 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
             cType:=xType
             switch Lower(cType)
                 case "array"
-                    if (hb_HHasKey(hSchema,"items"))
-                        if (self:CheckArray(xData,hSchema,cPath))
+                    if (hb_HHasKey(hSchema,"prefixItems"))
+                        if (!self:CheckArrayPrefixItems(xData,hSchema,cPath))
+                            if (self:lFastMode)
+                                break
+                            endif
+                        endif
+                    elseif (hb_HHasKey(hSchema,"items"))
+                        if (!self:CheckArrayItems(xData,hSchema,cPath))
                             if (self:lFastMode)
                                 break
                             endif
@@ -551,8 +699,14 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
                         cType:=xType
                         switch Lower(cType)
                             case "array"
-                                if (hb_HHasKey(hProperties[cProperty],"items"))
-                                    if (!self:CheckArray(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                if (hb_HHasKey(hProperties[cProperty],"prefixItems"))
+                                    if (!self:CheckArrayPrefixItems(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                        if (self:lFastMode)
+                                            break
+                                        endif
+                                    endif
+                                elseif (hb_HHasKey(hProperties[cProperty],"items"))
+                                    if (!self:CheckArrayItems(xData[cProperty],hProperties[cProperty],cPropertyPath))
                                         if (self:lFastMode)
                                             break
                                         endif

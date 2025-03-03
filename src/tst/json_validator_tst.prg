@@ -7,19 +7,9 @@
 
 REQUEST HB_CODEPAGE_UTF8EX
 
+memvar cSchema,cFunName
+
 procedure Main()
-
-    local aTests as array
-
-    local cJSON as character
-    local cSchema as character
-
-    local lValid as logical
-
-    local nTest as numeric
-    local nTestCount as numeric:=0
-
-    local oJSONValidator as object
 
     CLS
 
@@ -30,6 +20,129 @@ procedure Main()
         AltD(1)         // Enables the debugger. Press F5 to go.
         AltD()          // Invokes the debugger
     #endif
+
+    Execute()
+
+return
+
+static procedure Execute()
+
+    local aTests as array
+    local aColors as array
+    local aFunTst as array
+
+    local cJSON as character
+
+    local lValid as logical
+
+    local i as numeric
+    local nTest as numeric
+    local nTestCount as numeric:=0
+
+    local oJSONValidator as object
+
+    private cSchema as character
+    private cFunName as character
+
+    aFunTst:=Array(0)
+    aAdd(aFunTst,@getTst01())
+    aAdd(aFunTst,@getTst02())
+    aAdd(aFunTst,@getTst03())
+    aAdd(aFunTst,@getTst04())
+    aAdd(aFunTst,@getTst05())
+
+    aColors:=getColors(Len(aFunTst))
+
+    oJSONValidator:=JSONValidator():New("")
+    oJSONValidator:lFastMode:=.F.
+
+    for i:=1 to Len(aFunTst)
+
+        aTests:=hb_execFromArray(aFunTst[i])
+
+        oJSONValidator:SetSchema(cSchema)
+
+        lValid:=(!oJSONValidator:lHasError)
+
+        if (lValid)
+            SetColor("g+/n")
+            QOut("Result: Valid Schema!")
+            SetColor("")
+        else
+            SetColor("r+/n")
+            QOut("Result: Invalid JSON Schema. Errors found:")
+            SetColor("")
+            aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
+        endif
+
+        QOut(Replicate("=",80))
+
+        // Run each test case
+        for nTest:=1 to Len(aTests)
+
+            nTestCount++
+
+            SetColor(aColors[i])
+            QOut("=== Test "+hb_NToC(nTestCount)+"("+cFunName+"): "+aTests[nTest][1]+" ===")
+            SetColor("") /* Reset color to default */
+
+            cJSON:=aTests[nTest][2]
+            lValid:=oJSONValidator:Validate(cJSON)
+
+            if (lValid)
+                SetColor("g+/n")
+                QOut("Result: Valid JSON!")
+                SetColor("")
+            else
+                SetColor("r+/n")
+                QOut("Result: Invalid JSON. Errors found:")
+                SetColor("")
+                aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
+            endif
+
+            oJSONValidator:Reset()
+
+            // Verify expected outcome
+            if (lValid==aTests[nTest][3])
+                SetColor("g+/n")
+                QOut("Test passed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
+                SetColor("")
+            else
+                SetColor("r+/n")
+                QOut("Test failed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
+                SetColor("")
+            endif
+
+            QOut("")
+
+        next nTest
+
+    next i
+
+    return
+
+static function getColors(nTests as numeric)
+
+    local aColors as array:=Array(nTests)
+    local aColorBase as array:={;
+        "N","B","G","BG","R","RB","GR","W",;
+        "N*","B*","G*","BG*","R*","RB*","GR*","W*";
+    }
+
+    local i as numeric
+
+    // initialise colors
+    for i:=1 to nTests
+        aColors[i]:="W+/"+aColorBase[(i-1)%16+1]
+    next i
+
+    return(aColors)
+
+static function getTst01()
+
+    local aTests as array
+
+    cFunName:=ProcName()
 
     // JSON Schema example
     #pragma __cstream|cSchema:=%s
@@ -91,7 +204,7 @@ procedure Main()
 }
     #pragma __endtext
 
-    // Array of test cases: {description, JSON data, expected validity}
+    // Array of test cases: {description,JSON data,expected validity}
     aTests:={;
         {;//1
              "=> Valid case: all fields correct";
@@ -140,32 +253,32 @@ procedure Main()
         };
         ,{;//10
              "=> Valid case: at least one tag satisfies 'contains'";
-            ,'{"name": "JOHN W","age": 30,"salary": 15000,"tags": ["product-123", "other"]}';
+            ,'{"name": "JOHN W","age": 30,"salary": 15000,"tags": ["product-123","other"]}';
             ,.T.;
         };
         ,{;//11
              "=> Invalid case: no tags satisfy 'contains'";
-            ,'{"name": "ALICE S","age": 25,"salary": 15000,"tags": ["other", "another"]}';
+            ,'{"name": "ALICE S","age": 25,"salary": 15000,"tags": ["other","another"]}';
             ,.F.;
         };
         ,{;//12
              "=> Invalid case: too many tags satisfy 'contains'";
-            ,'{"name": "BOB B","age": 40,"salary": 15000,"tags": ["product-1", "product-2", "product-3", "product-4"]}';
+            ,'{"name": "BOB B","age": 40,"salary": 15000,"tags": ["product-1","product-2","product-3","product-4"]}';
             ,.F.;
         };
         ,{;//13
              "=> Valid case: exactly 2 tags satisfy 'contains'";
-            ,'{"name": "EVE Z","age": 22,"salary": 15000,"tags": ["product-a", "product-b", "other"]}';
+            ,'{"name": "EVE Z","age": 22,"salary": 15000,"tags": ["product-a","product-b","other"]}';
             ,.T.;
         };
         ,{;//14
              "=> Valid case: unique tags";
-            ,'{"name": "JOHN J","age": 30,"salary": 15000,"tags": ["product-123", "other"]}';
+            ,'{"name": "JOHN J","age": 30,"salary": 15000,"tags": ["product-123","other"]}';
             ,.T.;
         };
         ,{;//15
              "=> Invalid case: duplicate tags";
-            ,'{"name": "ALICE A","age": 25,"salary": 15000,"tags": ["product-123", "product-132","product-123","product-132","product-123"]}';
+            ,'{"name": "ALICE A","age": 25,"salary": 15000,"tags": ["product-123","product-132","product-123","product-132","product-123"]}';
             ,.F.;
         };
         ,{;//16
@@ -185,84 +298,35 @@ procedure Main()
         };
     }
 
-    oJSONValidator:=JSONValidator():New(cSchema)
-    oJSONValidator:lFastMode:=.F.
-    lValid:=(!oJSONValidator:lHasError)
+return(aTests)
 
-    if (lValid)
-        SetColor("g+/n")
-        QOut("Result: Valid Schema!")
-        SetColor("")
-    else
-        SetColor("r+/n")
-        QOut("Result: Invalid JSON Schema. Errors found:")
-        SetColor("")
-        aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
-    endif
+static function getTst02()
 
-    QOut(Replicate("=",80))
+    local aTests as array
 
-    // Run each test case
-    for nTest:=1 to Len(aTests)
-
-        nTestCount++
-
-        SetColor("BR/W+")
-        QOut("=== Test "+hb_NToC(nTestCount)+": "+aTests[nTest][1]+" ===")
-        SetColor("") /* Reset color to default */
-
-        cJSON:=aTests[nTest][2]
-        lValid:=oJSONValidator:Validate(cJSON)
-
-        if (lValid)
-            SetColor("g+/n")
-            QOut("Result: Valid JSON!")
-            SetColor("")
-        else
-            SetColor("r+/n")
-            QOut("Result: Invalid JSON. Errors found:")
-            SetColor("")
-            aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
-        endif
-
-        oJSONValidator:Reset()
-
-        // Verify expected outcome
-        if (lValid==aTests[nTest][3])
-            SetColor("g+/n")
-            QOut("Test passed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
-            SetColor("")
-        else
-            SetColor("r+/n")
-            QOut("Test failed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
-            SetColor("")
-        endif
-
-        QOut("")
-
-    next nTest
+    cFunName:=ProcName()
 
     // JSON Schema Enum example
     #pragma __cstream|cSchema:=%s
 {
     "type": "object",
-    "required": ["fruta", "numero", "opcao", "status"],
+    "required": ["fruit","number","option","status"],
     "properties": {
-        "fruta": {
+        "fruit": {
             "type": "string",
-            "enum": ["maçã", "banana", "cereja"]
+            "enum": ["apple","banana","cherry"]
         },
-        "numero": {
+        "number": {
             "type": "number",
-            "enum": [1, 2, 3]
+            "enum": [1,2,3]
         },
-        "opcao": {
+        "option": {
             "type": "string",
-            "enum": ["sim", "não"]
+            "enum": ["yes","no"]
         },
         "status": {
-            "type": ["string", "null"],
-            "enum": [null, "ativo", "inativo"]
+            "type": ["string","null"],
+            "enum": [null,"active","inactive"]
         }
     }
 }
@@ -270,70 +334,105 @@ procedure Main()
 
     // Array of test cases: Enum
     aTests:={;
-         {"Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": "ativo"}',.T.};
-        ,{"Fruta inválida",'{"fruta": "laranja", "numero": 2, "opcao": "sim", "status": "ativo"}',.F.};
-        ,{"Número inválido",'{"fruta": "banana", "numero": 4, "opcao": "sim", "status": "ativo"}',.F.};
-        ,{"Opção inválida",'{"fruta": "banana", "numero": 3, "opcao": "tim", "status": "ativo"}',.F.};
-        ,{"Todos válidos",'{"fruta": "banana", "numero": 2, "opcao": "sim", "status": null}',.T.};
-        ,{"Todos Inválidos",'{"fruta": "melância", "numero": 9, "opcao": "nao", "status": "em espera"}',.F.};
+         {"All valid",'{"fruit": "banana","number": 2,"option": "yes","status": "active"}',.T.};
+        ,{"Invalid fruit",'{"fruit": "orange","number": 2,"option": "yes","status": "active"}',.F.};
+        ,{"Invalid number",'{"fruit": "banana","number": 4,"option": "yes","status": "active"}',.F.};
+        ,{"Invalid option",'{"fruit": "banana","number": 3,"option": "maybe","status": "active"}',.F.};
+        ,{"All valid",'{"fruit": "banana","number": 2,"option": "yes","status": null}',.T.};
+        ,{"All invalid",'{"fruit": "watermelon","number": 9,"option": "no","status": "pending"}',.F.};
     }
 
-    oJSONValidator:Reset(cSchema)
+return(aTests)
 
-    lValid:=(!oJSONValidator:lHasError)
-    oJSONValidator:lFastMode:=.F.
+static function getTst03()
 
-    if (lValid)
-        SetColor("g+/n")
-        QOut("Result: Valid Schema!")
-        SetColor("")
-    else
-        SetColor("r+/n")
-        QOut("Result: Invalid JSON Schema. Errors found:")
-        SetColor("")
-        aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
-    endif
+    local aTests as array
 
-    QOut(Replicate("=",80))
+    cFunName:=ProcName()
 
-    // Run each test case
-    for nTest:=1 to Len(aTests)
+    // JSON Schema prefixItems example
+    #pragma __cstream|cSchema:=%s
+{
+  "type": "array",
+  "prefixItems": [
+    { "type": "number" },
+    { "type": "string" },
+    { "enum": ["Street","Avenue","Boulevard"] },
+    { "enum": ["NW","NE","SW","SE"] }
+  ]
+}
+    #pragma __endtext
 
-        nTestCount++
+    // Array of test cases: prefixItems without extra items
+    aTests:={;
+         {"All OK",'[1600,"Pennsylvania","Avenue","NW"]',.T.};
+        ,{"Drive is not one of the acceptable street types",'[24,"Sussex","Drive"]',.F.};
+        ,{"This address is missing a street number",'["Palais de l`Élysée"]',.F.};
+        ,{"It`s okay to not provide all of the items",'[10,"Downing","Street"]',.T.};
+        ,{"And,by default,it`s also okay to add additional items to end",'[1600,"Pennsylvania","Avenue","NW","Washington"]',.T.};
+    }
 
-        SetColor("W+/BR")
-        QOut("=== Test "+hb_NToC(nTestCount)+": "+aTests[nTest][1]+" ===")
-        SetColor("") /* Reset color to default */
+return(aTests)
 
-        cJSON:=aTests[nTest][2]
-        lValid:=oJSONValidator:Validate(cJSON)
+static function getTst04()
 
-        if (lValid)
-            SetColor("g+/n")
-            QOut("Result: Valid JSON!")
-            SetColor("")
-        else
-            SetColor("r+/n")
-            QOut("Result: Invalid JSON. Errors found:")
-            SetColor("")
-            aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
-        endif
+    local aTests as array
 
-        oJSONValidator:Reset()
+    cFunName:=ProcName()
 
-        // Verify expected outcome
-        if (lValid==aTests[nTest][3])
-            SetColor("g+/n")
-            QOut("Test passed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
-            SetColor("")
-        else
-            SetColor("r+/n")
-            QOut("Test failed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
-            SetColor("")
-        endif
+    // JSON Schema prefixItems example with "items": false
+    #pragma __cstream|cSchema:=%s
+{
+  "type": "array",
+  "prefixItems": [
+    { "type": "number" },
+    { "type": "string" },
+    { "enum": ["Street","Avenue","Boulevard"] },
+    { "enum": ["NW","NE","SW","SE"] }
+  ],
+  "items": false
+}
+    #pragma __endtext
 
-        QOut("")
+    // Array of test cases: prefixItems with items: false
+    aTests:={;
+         {"All OK",'[1600,"Pennsylvania","Avenue","NW"]',.T.};
+        ,{"Drive is not one of the acceptable street types",'[24,"Sussex","Drive"]',.F.};
+        ,{"This address is missing a street number",'["Palais de l`Élysée"]',.F.};
+        ,{"It`s okay to not provide all of the items",'[10,"Downing","Street"]',.T.};
+        ,{"It`s not okay to add additional items to end",'[1600,"Pennsylvania","Avenue","NW","Washington"]',.F.};
+    }
 
-    next nTest
+return(aTests)
 
-    return
+static function getTst05()
+
+    local aTests as array
+
+    cFunName:=ProcName()
+
+    // JSON Schema prefixItems example with "items" as an object
+    #pragma __cstream|cSchema:=%s
+{
+  "type": "array",
+  "prefixItems": [
+    { "type": "number" },
+    { "type": "string" },
+    { "enum": ["Street","Avenue","Boulevard"] },
+    { "enum": ["NW","NE","SW","SE"] }
+  ],
+  "items": { "type": "string" }
+}
+    #pragma __endtext
+
+    // Array of test cases: prefixItems with items as an object
+    aTests:={;
+         {"All OK",'[1600,"Pennsylvania","Avenue","NW"]',.T.};
+        ,{"Drive is not one of the acceptable street types",'[24,"Sussex","Drive"]',.F.};
+        ,{"This address is missing a street number",'["Palais de l`Élysée"]',.F.};
+        ,{"It`s okay to not provide all of the items",'[10,"Downing","Street"]',.T.};
+        ,{"It`s also okay to add additional items to end",'[1600,"Pennsylvania","Avenue","NW","Washington"]',.T.};
+        ,{"It`s not okay to add additional items to end",'[1600,"Pennsylvania","Avenue","NW","Washington",10]',.F.};
+    }
+
+  return(aTests)
