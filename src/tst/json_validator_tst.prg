@@ -188,6 +188,7 @@ procedure Main()
     oJSONValidator:=JSONValidator():New(cSchema)
     oJSONValidator:lFastMode:=.F.
     lValid:=(!oJSONValidator:lHasError)
+
     if (lValid)
         SetColor("g+/n")
         QOut("Result: Valid Schema!")
@@ -281,6 +282,7 @@ procedure Main()
 
     lValid:=(!oJSONValidator:lHasError)
     oJSONValidator:lFastMode:=.F.
+
     if (lValid)
         SetColor("g+/n")
         QOut("Result: Valid Schema!")

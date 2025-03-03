@@ -3,6 +3,11 @@
    Entries may not always be in chronological/commit order.
    See license at the end of file. */
 
+2025-03-03 10:28 UTC naldodj (% Optimizations)
+  % src/core/json_validator.prg
+  * src/tst/json_validator_tst.exe
+  * src/tst/json_validator_tst.prg
+
 2025-03-02 12:24 UTC naldodj (TODO List)
   * src/core/json_validator.prg
   * src/tst/json_validator_tst.exe

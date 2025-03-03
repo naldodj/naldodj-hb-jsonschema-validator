@@ -22,6 +22,7 @@ class JSONValidator
 
     data hSchema as hash
     data hJSONData as hash
+    data hRegexMatch as hash
 
     data lFastMode as logical
     data lHasError as logical
@@ -51,6 +52,7 @@ endclass
 method New(cSchema as character) class JSONValidator
     self:aErrors:={}
     self:aOnlyCheck:={}
+    self:hRegexMatch:={=>}
     self:lFastMode:=.T.
     self:lOnlyCheck:=.F.
     self:SetSchema(cSchema)
@@ -77,6 +79,7 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
 
     local nItem as numeric
     local nItems as numeric:=Len(aValues)
+    local nItemNext as numeric
     local nContainsCount as numeric:=0
 
     hb_Default(@cPath,"root")
@@ -103,15 +106,16 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
                 self:lOnlyCheck:=lOnlyCheck
             endif
             if (lUniqueItems)
+                nItemNext:=nItem+1
                 if (;
                     aScan(;
                          aValues;
                         ,{|x,y|;
-                            if(hb_HHasKey(hUniqueItems,y),hUniqueItems[y],hb_HSet(hUniqueItems,y,hb_JSONEncode(x))[y]);
+                            if(hb_HHasKey(hUniqueItems,y),hUniqueItems[y],hb_HSet(hUniqueItems,y,hb_Serialize(x))[y]);
                             ==;
-                            if(hb_HHasKey(hUniqueItems,nItem),hUniqueItems[nItem],hb_HSet(hUniqueItems,nItem,hb_JSONEncode(aValues[nItem]))[nItem]);
+                            if(hb_HHasKey(hUniqueItems,nItem),hUniqueItems[nItem],hb_HSet(hUniqueItems,nItem,hb_Serialize(aValues[nItem]))[nItem]);
                         };
-                        ,nItem+1;
+                        ,nItemNext;
                     )!=0;
                 )
                     lValid:=.F.
@@ -119,7 +123,7 @@ method CheckArray(aValues as array,hSchema as hash,cPath as character) class JSO
                         self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
                         break
                     endif
-                    self:AddError("Array at "+cPath+".Item("+hb_NToC(nItem)+") contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
+                    self:AddError("Array at "+cPath+".Item("+hb_NToC(nItem)+") contains duplicate item: ("+hb_JSONEncode(aValues[nItem])+"). All items must be unique as per schema 'uniqueItems' requirement.")
                 endif
             endif
         next nItem
@@ -278,7 +282,7 @@ method CheckPattern(cValue as character,cPattern as character,cPath as character
 
     hb_Default(@cPath,"root")
 
-    lValid:=__regexMatch(cValue,cPattern)
+    lValid:=__regexMatch(cValue,cPattern,@self:hRegexMatch)
     if (!lValid)
         self:AddError("Pattern mismatch at "+cPath+". Value: '"+cValue+"' does not match pattern: '"+cPattern+"'")
     endif
@@ -416,10 +420,14 @@ method SetSchema(cSchema as character) class JSONValidator
     local nLengthDecoded as numeric
     aSize(self:aErrors,0)
     aSize(self:aOnlyCheck,0)
-    self:cSchema:=cSchema
     self:lOnlyCheck:=.F.
-    nLengthDecoded:=hb_JSONDecode(self:cSchema,@self:hSchema)
-    self:lHasError:=((nLengthDecoded==0).or.ValType(self:hSchema)!="H")
+    if ((self:cSchema!=cSchema).or.(Empty(self:hSchema)))
+        self:cSchema:=cSchema
+        nLengthDecoded:=hb_JSONDecode(self:cSchema,@self:hSchema)
+        self:lHasError:=((nLengthDecoded==0).or.ValType(self:hSchema)!="H")
+    else
+        self:lHasError:=(ValType(self:hSchema)!="H")
+    endif
     if (self:lHasError)
         self:AddError("Invalid JSON Schema provided")
     endif
@@ -615,13 +623,20 @@ static function __HB2JSON(cType as character)
 
     return(cResult)
 
-static function __regexMatch(cString as character,cPattern as character)
+static function __regexMatch(cString as character,cPattern as character,hRegexMatch as hash)
 
     local aMatch as array
 
     local lMatch as logical
 
-    local pRegex as pointer:=hb_regexComp(cPattern,.T./* case-sensitive */,.F./* no multiline */)
+    local pRegex as pointer
+
+    if (hb_HHasKey(hRegexMatch,cPattern))
+        pRegex:=hRegexMatch[cPattern]
+    else
+        pRegex:=hb_regexComp(cPattern,.T./* case-sensitive */,.F./* no multiline */)
+        hRegexMatch[cPattern]:=pRegex
+    endif
 
     aMatch:=hb_regex(pRegex,cString,.T./* case-sensitive */)
     lMatch:=(!Empty(aMatch))
