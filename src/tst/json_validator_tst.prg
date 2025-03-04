@@ -407,7 +407,7 @@ static function getTst04()
   "prefixItems": [
     { "type": "number" },
     { "type": "string" },
-    { "enum": ["Street","Avenue","Boulevard"] },
+    { "enum": [{"pattern": "^Street"},"Avenue","Boulevard"] },
     { "enum": ["NW","NE","SW","SE"] }
   ],
   "items": false
@@ -488,7 +488,7 @@ static function getTst07()
     #pragma __cstream|cSchema:=%s
 {
   "type": "string",
-  "enum": ["Street","Avenue","Boulevard"]
+  "enum": [{"pattern": "^Street"},"Avenue","Boulevard"]
 }
     #pragma __endtext
 

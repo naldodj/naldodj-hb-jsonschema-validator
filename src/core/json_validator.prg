@@ -331,11 +331,30 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
     return(lValid)
 
 method CheckEnum(xValue as anytype,aEnum as array,cPath as character) class JSONValidator
-    local cValue as character:=hb_JSONEncode(xValue)
-    local cEnums as character:=hb_JSONEncode(aEnum)
-    local lValid as logical:=(cValue$cEnums)
+    local cEnumType as character
+    local cValueType as character:=valType(xValue)
+    local lValid as logical:=.F.
+    local lOnlyCheck:=self:lOnlyCheck
+    local i as numeric
+    for i:=1 to Len(aEnum)
+        cEnumType:=ValType(aEnum[i])
+        if ((cEnumType=="H").and.(hb_HHasKey(aEnum[i],"pattern")))
+            // Check pattern, if present
+            self:lOnlyCheck:=.T.
+                lValid:=self:CheckPattern(xValue,aEnum[i]["pattern"],cPath)
+            self:lOnlyCheck:=lOnlyCheck
+            if (lValid)
+                exit
+            endif
+        elseif (cValueType==cEnumType)
+            lValid:=(xValue==aEnum[i])
+            if (lValid)
+                exit
+            endif
+        endif
+    next i
     if (!lValid)
-        self:AddError("Invalid enum value at "+cPath+". Value: "+cValue+", Allowed values: "+cEnums)
+        self:AddError("Invalid enum value at "+cPath+". Value: "+hb_JSONEncode(xValue)+", Allowed values: "+hb_JSONEncode(aEnum))
     endif
     return(lValid)
 
