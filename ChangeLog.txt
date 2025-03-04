@@ -3,6 +3,9 @@
    Entries may not always be in chronological/commit order.
    See license at the end of file. */
 
+2025-03-03 22:19 UTC naldodj (DOC.md)
+  + DOC.md
+
 2025-03-03 20:28 UTC naldodj (TODO List: tupleValidation)
   * src/core/json_validator.prg
   * src/tst/json_validator_tst.exe
