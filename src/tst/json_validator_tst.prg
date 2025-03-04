@@ -50,11 +50,14 @@ static procedure Execute()
     aAdd(aFunTst,@getTst03())
     aAdd(aFunTst,@getTst04())
     aAdd(aFunTst,@getTst05())
+    aAdd(aFunTst,@getTst06())
+    aAdd(aFunTst,@getTst07())
+    aAdd(aFunTst,@getTst08())
 
     aColors:=getColors(Len(aFunTst))
 
     oJSONValidator:=JSONValidator():New("")
-    oJSONValidator:lFastMode:=.F.
+    oJSONValidator:SetFastMode(.F.)
 
     for i:=1 to Len(aFunTst)
 
@@ -62,7 +65,7 @@ static procedure Execute()
 
         oJSONValidator:SetSchema(cSchema)
 
-        lValid:=(!oJSONValidator:lHasError)
+        lValid:=(!oJSONValidator:HasError())
 
         if (lValid)
             SetColor("g+/n")
@@ -72,7 +75,7 @@ static procedure Execute()
             SetColor("r+/n")
             QOut("Result: Invalid JSON Schema. Errors found:")
             SetColor("")
-            aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
+            aEval(oJSONValidator:GetErros(),{|x| QOut("  "+x)})
         endif
 
         QOut(Replicate("=",80))
@@ -83,7 +86,7 @@ static procedure Execute()
             nTestCount++
 
             SetColor(aColors[i])
-            QOut("=== Test "+hb_NToC(nTestCount)+"("+cFunName+"): "+aTests[nTest][1]+" ===")
+            QOut("=== Test "+hb_NToC(nTestCount)+" ("+cFunName+"): "+aTests[nTest][1]+" ===")
             SetColor("") /* Reset color to default */
 
             cJSON:=aTests[nTest][2]
@@ -97,7 +100,7 @@ static procedure Execute()
                 SetColor("r+/n")
                 QOut("Result: Invalid JSON. Errors found:")
                 SetColor("")
-                aEval(oJSONValidator:aErrors,{|x| QOut("  "+x)})
+                aEval(oJSONValidator:GetErros(),{|x| QOut("  "+x)})
             endif
 
             oJSONValidator:Reset()
@@ -137,6 +140,23 @@ static function getColors(nTests as numeric)
     next i
 
     return(aColors)
+
+static function DateDiffYear(dDate1 as date,dDate2 as date)
+
+    local nMonth1 as numeric
+    local nMonth2 as numeric
+    local nYearDiff as numeric
+
+    nMonth1:=((Year(dDate1)*12)+Month(dDate1))
+    nMonth2:=((Year(dDate2)*12)+Month(dDate2))
+    nYearDiff:=((nMonth1-nMonth2)-1)
+    if (Day(dDate1)>=Day(dDate2))
+        ++nYearDiff
+    endif
+    nYearDiff/=12
+    nYearDiff:=Int(nYearDiff)
+
+    return(nYearDiff)
 
 static function getTst01()
 
@@ -204,101 +224,101 @@ static function getTst01()
 }
     #pragma __endtext
 
-    // Array of test cases: {description,JSON data,expected validity}
+    // Array of test cases: {description, JSON data, expected validity}
     aTests:={;
         {;//1
-             "=> Valid case: all fields correct";
+             "=> Valid case: All fields are correct";
             ,'{"name": "JOHN B","age": 30,"salary": 15000,"tags": ["product-123"],"address": {"city": "New York","zip": "12345-678"}}';
             ,.T.;
         };
         ,{;//2
-             "=> Invalid case: missing required 'name' and 'salary'";
+             "=> Invalid case: Missing required fields: 'name' and 'salary'";
             ,'{"age": 25,"tags": ["test"]}';
             ,.F.;
         };
         ,{;//3
-             "=> Invalid case: wrong type for 'age'";
+             "=> Invalid case: Incorrect type for 'age'";
             ,'{"name": "ALICE K","age": "thirty","salary": 1501.054,"tags": ["demo"]}';
             ,.F.;
         };
         ,{;//4
-             "=> Invalid case: 'tags' with wrong item type";
+             "=> Invalid case: Incorrect item type in 'tags'";
             ,'{"name": "BOB D","age": 40,"salary": 15000,"tags": ["tag1",123]}';
             ,.F.;
         };
         ,{;//5
-             "=> Invalid case: 'tags' below minItems";
+             "=> Invalid case: 'tags' contains fewer items than the minimum required";
             ,'{"name": "EVE T","age": 22,"salary": 15000,"tags": []}';
             ,.F.;
         };
         ,{;//6
-             "=> Invalid case: 'tags' above maxItems";
+             "=> Invalid case: 'tags' contains more items than the maximum allowed";
             ,'{"name": "FRANK M","age": 35,"salary": 15000,"tags": ["product-000","product-001","product-002","product-003","product-004","product-005","product-006","product-007","product-008","product-009","product-010"]}';
             ,.F.;
         };
         ,{;//7
-             "=> Invalid case: invalid 'zip' pattern";
+             "=> Invalid case: 'zip' does not match the required pattern";
             ,'{"name": "GRACE K","age": 28,"salary": 15000,"tags": ["valid"],"address": {"city": "LA","zip": "1234-567"}}';
             ,.F.;
         };
         ,{;//8
-             "=> Valid case: minimal valid data";
+             "=> Valid case: Minimal valid data";
             ,'{"name": "HANK D","age": 50,"salary": 15000,"tags": ["product-123"]}';
             ,.T.;
         };
         ,{;//9
-             "=> Invalid case: 'address' with wrong type";
+             "=> Invalid case: 'address' has an incorrect type";
             ,'{"name": "IVY P","age": 33,"salary": 15000,"tags": ["test"],"address": "not an object"}';
             ,.F.;
         };
         ,{;//10
-             "=> Valid case: at least one tag satisfies 'contains'";
+             "=> Valid case: At least one tag satisfies the 'contains' condition";
             ,'{"name": "JOHN W","age": 30,"salary": 15000,"tags": ["product-123","other"]}';
             ,.T.;
         };
         ,{;//11
-             "=> Invalid case: no tags satisfy 'contains'";
+             "=> Invalid case: No tag satisfies the 'contains' condition";
             ,'{"name": "ALICE S","age": 25,"salary": 15000,"tags": ["other","another"]}';
             ,.F.;
         };
         ,{;//12
-             "=> Invalid case: too many tags satisfy 'contains'";
+             "=> Invalid case: Too many tags satisfy the 'contains' condition";
             ,'{"name": "BOB B","age": 40,"salary": 15000,"tags": ["product-1","product-2","product-3","product-4"]}';
             ,.F.;
         };
         ,{;//13
-             "=> Valid case: exactly 2 tags satisfy 'contains'";
+             "=> Valid case: Exactly two tags satisfy the 'contains' condition";
             ,'{"name": "EVE Z","age": 22,"salary": 15000,"tags": ["product-a","product-b","other"]}';
             ,.T.;
         };
         ,{;//14
-             "=> Valid case: unique tags";
+             "=> Valid case: Unique tags";
             ,'{"name": "JOHN J","age": 30,"salary": 15000,"tags": ["product-123","other"]}';
             ,.T.;
         };
         ,{;//15
-             "=> Invalid case: duplicate tags";
+             "=> Invalid case: Duplicate tags found";
             ,'{"name": "ALICE A","age": 25,"salary": 15000,"tags": ["product-123","product-132","product-123","product-132","product-123"]}';
             ,.F.;
         };
         ,{;//16
-             "=> Invalid case: 'salary' below minimum";
+             "=> Invalid case: 'salary' is below the minimum allowed";
             ,'{"name": "EVE K","age": 0,"salary": 0,"tags": ["product-000","product-001","product-002"]}';
             ,.F.;
         };
         ,{;//17
-             "=> Invalid case: 'salary' above maximum";
+             "=> Invalid case: 'salary' is above the maximum allowed";
             ,'{"name": "FRANK T","age": 155,"salary": 999999,"tags": ["product-000","product-001","product-002"]}';
             ,.F.;
         };
         ,{;//18
-             "=> Invalid case: 'name'";
-            ,'{"name": "PEDRO DE ALCÂNTARA JOÃO CARLOS LEOPOLDO SALVADOR BIBIANO FRANCISCO XAVIER DE PAULA LEOCÁDIO MIGUEL GABRIEL RAFAEL GONZAGA","age": 155,"salary": 999999,"tags": ["product-000","product-001","product-002"]}';
+             "=> Invalid case: 'name' exceeds the maximum length";
+            ,'{"name": "PEDRO DE ALCÂNTARA JOÃO CARLOS LEOPOLDO SALVADOR BIBIANO FRANCISCO XAVIER DE PAULA LEOCÁDIO MIGUEL GABRIEL RAFAEL GONZAGA","age": '+hb_NToC(DateDiffYear(Date(),SToD("18251202")))+',"salary": 999999,"tags": ["product-000","product-001","product-002"]}';
             ,.F.;
         };
     }
 
-return(aTests)
+    return(aTests)
 
 static function getTst02()
 
@@ -334,15 +354,15 @@ static function getTst02()
 
     // Array of test cases: Enum
     aTests:={;
-         {"All valid",'{"fruit": "banana","number": 2,"option": "yes","status": "active"}',.T.};
-        ,{"Invalid fruit",'{"fruit": "orange","number": 2,"option": "yes","status": "active"}',.F.};
-        ,{"Invalid number",'{"fruit": "banana","number": 4,"option": "yes","status": "active"}',.F.};
-        ,{"Invalid option",'{"fruit": "banana","number": 3,"option": "maybe","status": "active"}',.F.};
-        ,{"All valid",'{"fruit": "banana","number": 2,"option": "yes","status": null}',.T.};
-        ,{"All invalid",'{"fruit": "watermelon","number": 9,"option": "no","status": "pending"}',.F.};
+         {"Valid case: All fields are valid",'{"fruit": "banana","number": 2,"option": "yes","status": "active"}',.T.};
+        ,{"Invalid case: 'fruit' value is not allowed",'{"fruit": "orange","number": 2,"option": "yes","status": "active"}',.F.};
+        ,{"Invalid case: 'number' value is not allowed",'{"fruit": "banana","number": 4,"option": "yes","status": "active"}',.F.};
+        ,{"Invalid case: 'option' value is not allowed",'{"fruit": "banana","number": 3,"option": "maybe","status": "active"}',.F.};
+        ,{"Valid case: All fields are valid",'{"fruit": "banana","number": 2,"option": "yes","status": null}',.T.};
+        ,{"Invalid case: All fields are invalid",'{"fruit": "watermelon","number": 9,"option": "no","status": "pending"}',.F.};
     }
 
-return(aTests)
+    return(aTests)
 
 static function getTst03()
 
@@ -365,14 +385,14 @@ static function getTst03()
 
     // Array of test cases: prefixItems without extra items
     aTests:={;
-         {"All OK",'[1600,"Pennsylvania","Avenue","NW"]',.T.};
-        ,{"Drive is not one of the acceptable street types",'[24,"Sussex","Drive"]',.F.};
-        ,{"This address is missing a street number",'["Palais de l`Élysée"]',.F.};
-        ,{"It`s okay to not provide all of the items",'[10,"Downing","Street"]',.T.};
-        ,{"And,by default,it`s also okay to add additional items to end",'[1600,"Pennsylvania","Avenue","NW","Washington"]',.T.};
+         {"Valid case: All items are valid",'[1600,"Pennsylvania","Avenue","NW"]',.T.};
+        ,{"Invalid case: 'Drive' is not an acceptable street type",'[24,"Sussex","Drive"]',.F.};
+        ,{"Invalid case: Missing street number in address",'["Palais de l`Élysée"]',.F.};
+        ,{"Valid case: Omitting some items is acceptable",'[10,"Downing","Street"]',.T.};
+        ,{"Valid case: Additional items at the end are acceptable by default",'[1600,"Pennsylvania","Avenue","NW","Washington"]',.T.};
     }
 
-return(aTests)
+    return(aTests)
 
 static function getTst04()
 
@@ -396,14 +416,14 @@ static function getTst04()
 
     // Array of test cases: prefixItems with items: false
     aTests:={;
-         {"All OK",'[1600,"Pennsylvania","Avenue","NW"]',.T.};
-        ,{"Drive is not one of the acceptable street types",'[24,"Sussex","Drive"]',.F.};
-        ,{"This address is missing a street number",'["Palais de l`Élysée"]',.F.};
-        ,{"It`s okay to not provide all of the items",'[10,"Downing","Street"]',.T.};
-        ,{"It`s not okay to add additional items to end",'[1600,"Pennsylvania","Avenue","NW","Washington"]',.F.};
+         {"Valid case: All items are valid",'[1600,"Pennsylvania","Avenue","NW"]',.T.};
+        ,{"Invalid case: 'Drive' is not an acceptable street type",'[24,"Sussex","Drive"]',.F.};
+        ,{"Invalid case: Missing street number in address",'["Palais de l`Élysée"]',.F.};
+        ,{"Valid case: Omitting some items is acceptable",'[10,"Downing","Street"]',.T.};
+        ,{"Invalid case: Additional items at the end are not allowed",'[1600,"Pennsylvania","Avenue","NW","Washington"]',.F.};
     }
 
-return(aTests)
+    return(aTests)
 
 static function getTst05()
 
@@ -427,12 +447,80 @@ static function getTst05()
 
     // Array of test cases: prefixItems with items as an object
     aTests:={;
-         {"All OK",'[1600,"Pennsylvania","Avenue","NW"]',.T.};
-        ,{"Drive is not one of the acceptable street types",'[24,"Sussex","Drive"]',.F.};
-        ,{"This address is missing a street number",'["Palais de l`Élysée"]',.F.};
-        ,{"It`s okay to not provide all of the items",'[10,"Downing","Street"]',.T.};
-        ,{"It`s also okay to add additional items to end",'[1600,"Pennsylvania","Avenue","NW","Washington"]',.T.};
-        ,{"It`s not okay to add additional items to end",'[1600,"Pennsylvania","Avenue","NW","Washington",10]',.F.};
+         {"Valid case: All items are valid",'[1600,"Pennsylvania","Avenue","NW"]',.T.};
+        ,{"Invalid case: 'Drive' is not an acceptable street type",'[24,"Sussex","Drive"]',.F.};
+        ,{"Invalid case: Missing street number in address",'["Palais de l`Élysée"]',.F.};
+        ,{"Valid case: Omitting some items is acceptable",'[10,"Downing","Street"]',.T.};
+        ,{"Valid case: Additional items at the end are acceptable",'[1600,"Pennsylvania","Avenue","NW","Washington"]',.T.};
+        ,{"Invalid case: Additional items at the end are not allowed",'[1600,"Pennsylvania","Avenue","NW","Washington",10]',.F.};
     }
 
-  return(aTests)
+    return(aTests)
+
+static function getTst06()
+
+    local aTests as array
+
+    cFunName:=ProcName()
+
+    // JSON Schema string
+    #pragma __cstream|cSchema:=%s
+{
+  "type": "string"
+}
+    #pragma __endtext
+
+    // Array of test cases: string
+    aTests:={;
+         {"Valid case: String is valid",'"Street"',.T.};
+        ,{"Invalid case: Number is not a valid string",'24',.F.};
+    }
+
+    return(aTests)
+
+static function getTst07()
+
+    local aTests as array
+
+    cFunName:=ProcName()
+
+    // JSON Schema string example with "enum"
+    #pragma __cstream|cSchema:=%s
+{
+  "type": "string",
+  "enum": ["Street","Avenue","Boulevard"]
+}
+    #pragma __endtext
+
+    // Array of test cases: enum
+    aTests:={;
+         {"Valid case: 'Street' is allowed",'"Street"',.T.};
+        ,{"Valid case: 'Avenue' is allowed",'"Avenue"',.T.};
+        ,{"Valid case: 'Boulevard' is allowed",'"Boulevard"',.T.};
+        ,{"Invalid case: Value is not allowed",'"Hello World"',.F.};
+    }
+
+    return(aTests)
+
+static function getTst08()
+
+    local aTests as array
+
+    cFunName:=ProcName()
+
+    // JSON Schema string example with "pattern"
+    #pragma __cstream|cSchema:=%s
+{
+  "type": "string",
+  "pattern": "^(?:Yes|No)$"
+}
+    #pragma __endtext
+
+    // Array of test cases: pattern
+    aTests:={;
+         {"Valid case: 'Yes' is allowed",'"Yes"',.T.};
+        ,{"Valid case: 'No' is allowed",'"No"',.T.};
+        ,{"Invalid case: Value does not match the required pattern",'"Mabe"',.F.};
+    }
+
+    return(aTests)

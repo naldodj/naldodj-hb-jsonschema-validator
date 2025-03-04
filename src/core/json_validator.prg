@@ -15,22 +15,25 @@
 
 class JSONValidator
 
-    data aErrors as array
-    data aOnlyCheck as array
+#ifndef __ALT_D__
+    HIDDEN:
+#endif
 
-    data cSchema as character
+    data aErrors as array init {}
+    data aOnlyCheck as array init {}
 
-    data hSchema as hash
-    data hRegexMatch as hash
+    data cSchema as character init ""
 
-    data lFastMode as logical
-    data lHasError as logical
-    data lOnlyCheck as logical
+    data hSchema as hash init {=>}
+    data hRegexMatch as hash init {=>}
 
-    data xJSONData as hash,array
+    data lFastMode as logical init .T.
+    data lHasError as logical init .F.
+    data lOnlyCheck as logical init .F.
 
-    method New(cSchema as character) constructor
+    data xJSONData as anytype
 
+//-----------------------------------------------------------------------
     method AddError(cError)
 
     method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) as logical
@@ -42,21 +45,28 @@ class JSONValidator
     method CheckString(cValue as numeric,hSchema as hash,cPath as character) as logical
     method CheckType(xValue as anytype,xType as anytype,cPath as character) as logical
 
-    method Reset(cSchema as character) as logical
+    method ValidateObject(xData as anytype,hSchema as hash,cPath as character) as logical
 
+    method regexMatch(cString as character,cPattern as character) as character
+
+//-----------------------------------------------------------------------
+
+    EXPORTED:
+
+    method GetErros() INLINE self:aErrors
+    method HasError() INLINE self:lHasError
+
+    method New(cSchema as character) constructor
+
+    method Reset(cSchema as character) as logical
     method SetSchema(cSchema as character) as logical
+    method SetFastMode(lFastMode as logical) as logical
 
     method Validate(cJSONData as character) as logical
-    method ValidateObject(xData as anytype,hSchema as hash,cPath as character) as logical
 
 endclass
 
 method New(cSchema as character) class JSONValidator
-    self:aErrors:={}
-    self:aOnlyCheck:={}
-    self:hRegexMatch:={=>}
-    self:lFastMode:=.T.
-    self:lOnlyCheck:=.F.
     self:SetSchema(cSchema)
     return(self)
 
@@ -424,7 +434,7 @@ method CheckPattern(cValue as character,cPattern as character,cPath as character
 
     hb_Default(@cPath,"root")
 
-    lValid:=__regexMatch(cValue,cPattern,@self:hRegexMatch)
+    lValid:=self:regexMatch(cValue,cPattern)
     if (!lValid)
         self:AddError("Pattern mismatch at "+cPath+". Value: '"+cValue+"' does not match pattern: '"+cPattern+"'")
     endif
@@ -556,7 +566,7 @@ method CheckType(xValue as anytype,xType as anytype,cPath as character) class JS
 
 method Reset(cSchema as character) class JSONValidator
     hb_default(@cSchema,self:cSchema)
-return(self:SetSchema(cSchema))
+    return(self:SetSchema(cSchema))
 
 method SetSchema(cSchema as character) class JSONValidator
     local nLengthDecoded as numeric
@@ -573,20 +583,25 @@ method SetSchema(cSchema as character) class JSONValidator
     if (self:lHasError)
         self:AddError("Invalid JSON Schema provided")
     endif
-return (!self:lHasError)
+    return(!self:lHasError)
+
+method SetFastMode(lFastMode as logical) class JSONValidator
+    local lValue as logical:=self:lFastMode
+    self:lFastMode:=lFastMode
+    return(lValue)
 
 method Validate(cJSONData as character) class JSONValidator
     local nLengthDecoded as numeric
     begin sequence
         nLengthDecoded:=hb_JSONDecode(cJSONData,@self:xJSONData)
-        if (((nLengthDecoded==0).or.(!ValType(self:xJSONData)$"A|H")))
+        if (((nLengthDecoded==0).or.(!ValType(self:xJSONData)$"A|C|H|L|N")))
             self:AddError("Invalid JSON data provided")
             break
         endif
         self:ValidateObject(self:xJSONData,self:hSchema,"root")
     end sequence
     self:lHasError:=(!Empty(self:aErrors))
-    return (!self:lHasError)
+    return(!self:lHasError)
 
 method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class JSONValidator
 
@@ -745,7 +760,27 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
 
     self:lHasError:=(!Empty(self:aErrors))
 
-    return (!self:lHasError)
+    return(!self:lHasError)
+
+method regexMatch(cString as character,cPattern as character) class JSONValidator
+
+    local aMatch as array
+
+    local lMatch as logical
+
+    local pRegex as pointer
+
+    if (hb_HHasKey(self:hRegexMatch,cPattern))
+        pRegex:=self:hRegexMatch[cPattern]
+    else
+        pRegex:=hb_regexComp(cPattern,.T./* case-sensitive */,.F./* no multiline */)
+        self:hRegexMatch[cPattern]:=pRegex
+    endif
+
+    aMatch:=hb_regex(pRegex,cString,.T./* case-sensitive */)
+    lMatch:=(!Empty(aMatch))
+
+    return(lMatch)
 
 static function __HB2JSON(cType as character)
     local cResult as character
@@ -776,23 +811,3 @@ static function __HB2JSON(cType as character)
     end switch
 
     return(cResult)
-
-static function __regexMatch(cString as character,cPattern as character,hRegexMatch as hash)
-
-    local aMatch as array
-
-    local lMatch as logical
-
-    local pRegex as pointer
-
-    if (hb_HHasKey(hRegexMatch,cPattern))
-        pRegex:=hRegexMatch[cPattern]
-    else
-        pRegex:=hb_regexComp(cPattern,.T./* case-sensitive */,.F./* no multiline */)
-        hRegexMatch[cPattern]:=pRegex
-    endif
-
-    aMatch:=hb_regex(pRegex,cString,.T./* case-sensitive */)
-    lMatch:=(!Empty(aMatch))
-
-    return(lMatch)
