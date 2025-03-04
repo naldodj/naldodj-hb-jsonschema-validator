@@ -337,8 +337,7 @@ method CheckEnum(xValue as anytype,aEnum as array,cPath as character) class JSON
     local lOnlyCheck:=self:lOnlyCheck
     local i as numeric
     for i:=1 to Len(aEnum)
-        cEnumType:=ValType(aEnum[i])
-        if ((cEnumType=="H").and.(hb_HHasKey(aEnum[i],"pattern")))
+        if ((hb_IsHash(aEnum[i])).and.(hb_HHasKey(aEnum[i],"pattern")))
             // Check pattern, if present
             self:lOnlyCheck:=.T.
                 lValid:=self:CheckPattern(xValue,aEnum[i]["pattern"],cPath)
@@ -346,10 +345,13 @@ method CheckEnum(xValue as anytype,aEnum as array,cPath as character) class JSON
             if (lValid)
                 exit
             endif
-        elseif (cValueType==cEnumType)
-            lValid:=(xValue==aEnum[i])
-            if (lValid)
-                exit
+        else
+            cEnumType:=ValType(aEnum[i])
+            if (cValueType==cEnumType)
+                lValid:=(xValue==aEnum[i])
+                if (lValid)
+                    exit
+                endif
             endif
         endif
     next i
@@ -472,7 +474,7 @@ method CheckRequired(hData as hash,aRequired as array,cPath as character) class 
 
     begin sequence
 
-        if (ValType(hData)!="H")
+        if (!hb_IsHash(hData))
             lValid:=.F.
             self:AddError("Expected an object at "+cPath+" to check required properties")
             break
@@ -595,9 +597,9 @@ method SetSchema(cSchema as character) class JSONValidator
     if ((self:cSchema!=cSchema).or.(Empty(self:hSchema)))
         self:cSchema:=cSchema
         nLengthDecoded:=hb_JSONDecode(self:cSchema,@self:hSchema)
-        self:lHasError:=((nLengthDecoded==0).or.ValType(self:hSchema)!="H")
+        self:lHasError:=((nLengthDecoded==0).or.(!hb_IsHash(self:hSchema)))
     else
-        self:lHasError:=(ValType(self:hSchema)!="H")
+        self:lHasError:=(!hb_IsHash(self:hSchema))
     endif
     if (self:lHasError)
         self:AddError("Invalid JSON Schema provided")
@@ -627,7 +629,6 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
     local aRequired as array
 
     local cType as character
-    local cDataType as character
     local cProperty as character
     local cPropertyPath as character
 
@@ -653,7 +654,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
             self:CheckEnum(xData,hSchema["enum"],cPath)
         endif
 
-        if (valtype(xType)=="C")
+        if (hb_IsString(xType))
             cType:=xType
             switch Lower(cType)
                 case "array"
@@ -691,8 +692,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
             end switch
         endif
 
-        cDataType:=valtype(xData)
-        if (cDataType!="H")
+        if (!hb_IsHash(xData))
             break
         endif
 
@@ -729,7 +729,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
                             endif
                         endif
                     endif
-                    if (valtype(xType)=="C")
+                    if (hb_IsString(xType))
                         cType:=xType
                         switch Lower(cType)
                             case "array"
