@@ -53,17 +53,17 @@ static procedure Execute()
     private cFunName as character
 
     aFunTst:=Array(0)
-    aAdd(aFunTst,@getTst01())
-    aAdd(aFunTst,@getTst02())
-    aAdd(aFunTst,@getTst03())
-    aAdd(aFunTst,@getTst04())
-    aAdd(aFunTst,@getTst05())
-    aAdd(aFunTst,@getTst06())
-    aAdd(aFunTst,@getTst07())
-    aAdd(aFunTst,@getTst08())
-    aAdd(aFunTst,@getTst09())
-    aAdd(aFunTst,@getTst10())
-    aAdd(aFunTst,@getTst11())
+    aAdd(aFunTst,{@getTst01(),"getTst01",.F.})
+    aAdd(aFunTst,{@getTst02(),"getTst02",.F.})
+    aAdd(aFunTst,{@getTst03(),"getTst03",.F.})
+    aAdd(aFunTst,{@getTst04(),"getTst04",.F.})
+    aAdd(aFunTst,{@getTst05(),"getTst05",.F.})
+    aAdd(aFunTst,{@getTst06(),"getTst06",.F.})
+    aAdd(aFunTst,{@getTst07(),"getTst07",.F.})
+    aAdd(aFunTst,{@getTst08(),"getTst08",.F.})
+    aAdd(aFunTst,{@getTst09(),"getTst09",.F.})
+    aAdd(aFunTst,{@getTst10(),"getTst10",.F.})
+    aAdd(aFunTst,{@getTst11(),"getTst11",.F.})
 
     aColors:=getColors(Len(aFunTst))
 
@@ -72,7 +72,7 @@ static procedure Execute()
 
     for i:=1 to Len(aFunTst)
 
-        aTests:=hb_execFromArray(aFunTst[i])
+        aTests:=hb_execFromArray(aFunTst[i][1])
 
         oJSONValidator:SetSchema(cSchema)
 
@@ -117,7 +117,8 @@ static procedure Execute()
             oJSONValidator:Reset()
 
             // Verify expected outcome
-            if (lValid==aTests[nTest][3])
+            aFunTst[i][3]:=(lValid==aTests[nTest][3])
+            if (aFunTst[i][3])
                 SetColor("g+/n")
                 QOut("Test passed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
                 SetColor("")
@@ -131,6 +132,22 @@ static procedure Execute()
 
         next nTest
 
+    next i
+
+    QOut(Replicate("=",80))
+
+    for i:=1 to Len(aFunTst)
+        // Verify expected outcome
+        lValid:=aFunTst[i][3]
+        if (lValid)
+            SetColor("g+/n")
+            QOut("("+aFunTst[i][2]+"): passed")
+            SetColor("")
+        else
+            SetColor("r+/n")
+            QOut("("+aFunTst[i][2]+"): failed")
+            SetColor("")
+        endif
     next i
 
     return
