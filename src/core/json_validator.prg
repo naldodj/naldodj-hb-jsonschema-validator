@@ -13,6 +13,12 @@
 
 #include "hbclass.ch"
 
+#ifndef HB_SYMBOL_UNUSED
+    #define HB_SYMBOL_UNUSED( symbol )  ( symbol := ( symbol ) )
+#endif
+
+memvar m__hRefSchema
+
 class JSONValidator
 
 #ifndef __ALT_D__
@@ -47,7 +53,11 @@ class JSONValidator
 
     method ValidateObject(xData as anytype,hSchema as hash,cPath as character) as logical
 
-    method regexMatch(cString as character,cPattern as character) as character
+    method RegexMatch(cString as character,cPattern as character) as character
+
+    method ResolveRef(cRef as character,cPath as character) as hash
+    method ResolveInternalRef(cRef as character,cPath as character) as hash
+    method ResolveExternalRef(cRef as character,cPath as character) as hash
 
 //-----------------------------------------------------------------------
 
@@ -83,10 +93,12 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
     local cItemPath as character
 
     local lValid as logical:=.T.
-    local lContains as logical:=hb_HHasKey(hSchema,"contains")
+    local lHasRef as logical:=hb_HHasKey(hSchema["items"],"$ref")
     local lOnlyCheck:=self:lOnlyCheck
+    local lHasContains as logical:=hb_HHasKey(hSchema,"contains")
     local lUniqueItems as logical:=(hb_HHasKey(hSchema,"uniqueItems").and.hSchema["uniqueItems"])
 
+    local hSchemaItems as hash
     local hUniqueItems as hash
 
     local nItem as numeric
@@ -94,23 +106,30 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
     local nItemNext as numeric
     local nContainsCount as numeric:=0
 
+
     hb_Default(@cPath,"root")
 
     if (lUniqueItems)
         hUniqueItems:={=>}
     endif
 
+    if (lHasRef)
+        hSchemaItems:=self:ResolveRef(hSchema["items"]["$ref"],cPath)
+    else
+        hSchemaItems:=hSchema["items"]
+    endif
+
     begin sequence
 
         for nItem:=1 to nItems
             cItemPath:=(cPath+".item("+hb_NToC(nItem)+")")
-            if (!self:ValidateObject(aValues[nItem],hSchema["items"],cItemPath))
+            if (!self:ValidateObject(aValues[nItem],hSchemaItems,cItemPath))
                 lValid:=.F.
                 if (self:lFastMode)
                     break
                 endif
             endif
-            if (lContains)
+            if (lHasContains)
                 self:lOnlyCheck:=.T.
                 if (self:ValidateObject(aValues[nItem],hSchema["contains"],cItemPath))
                     nContainsCount++
@@ -140,7 +159,7 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
             endif
         next nItem
 
-        if (lContains)
+        if (lHasContains)
             // Additional checks after iteration
             nContainsCount:=Max(nContainsCount-=Len(self:aOnlyCheck),0)
             aSize(self:aOnlyCheck,0)
@@ -198,11 +217,13 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
     local cItemPath as character
     local cItemType as character
 
+    local lHasRef as logical
     local lValid as logical:=.T.
-    local lContains as logical:=hb_HHasKey(hSchema,"contains")
+    local lHasContains as logical:=hb_HHasKey(hSchema,"contains")
     local lOnlyCheck:=self:lOnlyCheck
     local lUniqueItems as logical:=(hb_HHasKey(hSchema,"uniqueItems").and.hSchema["uniqueItems"])
 
+    local hSchemaItems as hash
     local hUniqueItems as hash
 
     local nItem as numeric
@@ -222,13 +243,19 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
 
         for nItem:=1 to Min(nItems,nPrefixItems)
             cItemPath:=(cPath+".item("+hb_NToC(nItem)+")")
-            if (!self:ValidateObject(aValues[nItem],aPrefixItems[nItem],cItemPath))
+            lHasRef:=hb_HHasKey(aPrefixItems[nItem],"$ref")
+            if (lHasRef)
+                hSchemaItems:=self:ResolveRef(aPrefixItems[nItem]["$ref"],cItemPath)
+            else
+                hSchemaItems:=aPrefixItems[nItem]
+            endif
+            if (!self:ValidateObject(aValues[nItem],hSchemaItems,cItemPath))
                 lValid:=.F.
                 if (self:lFastMode)
                     break
                 endif
             endif
-            if (lContains)
+            if (lHasContains)
                 self:lOnlyCheck:=.T.
                 if (self:ValidateObject(aValues[nItem],hSchema["contains"],cItemPath))
                     nContainsCount++
@@ -280,7 +307,7 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
             endif
         endif
 
-        if (lContains)
+        if (lHasContains)
             // Additional checks after iteration
             nContainsCount:=Max(nContainsCount-=Len(self:aOnlyCheck),0)
             aSize(self:aOnlyCheck,0)
@@ -455,7 +482,7 @@ method CheckPattern(cValue as character,cPattern as character,cPath as character
 
     hb_Default(@cPath,"root")
 
-    lValid:=self:regexMatch(cValue,cPattern)
+    lValid:=self:RegexMatch(cValue,cPattern)
     if (!lValid)
         self:AddError("Pattern mismatch at "+cPath+". Value: '"+cValue+"' does not match pattern: '"+cPattern+"'")
     endif
@@ -633,8 +660,10 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
     local cPropertyPath as character
 
     local hProperties as hash
+    local hPropertySchema as hash
 
     local lValid as logical
+    local lHasRef as logical
 
     local xType as anytype
 
@@ -713,8 +742,14 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
         for each cProperty in hb_HKeys(hProperties)
             if (hb_HHasKey(xData,cProperty))
                 cPropertyPath:=(cPath+"."+cProperty)
-                if (hb_HHasKey(hProperties[cProperty],"type"))
-                    xType:=hProperties[cProperty]["type"]
+                lHasRef:=hb_HHasKey(hProperties[cProperty],"$ref")
+                if (lHasRef)
+                    hPropertySchema:=self:ResolveRef(hProperties[cProperty]["$ref"],cPropertyPath)
+                else
+                    hPropertySchema:=hProperties[cProperty]
+                endif
+                if (hb_HHasKey(hPropertySchema,"type"))
+                    xType:=hPropertySchema["type"]
                     lValid:=self:CheckType(xData[cProperty],xType,cPropertyPath)
                     if (!lValid)
                         if (self:lFastMode)
@@ -781,7 +816,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
 
     return(!self:lHasError)
 
-method regexMatch(cString as character,cPattern as character) class JSONValidator
+method RegexMatch(cString as character,cPattern as character) class JSONValidator
 
     local aMatch as array
 
@@ -800,6 +835,53 @@ method regexMatch(cString as character,cPattern as character) class JSONValidato
     lMatch:=(!Empty(aMatch))
 
     return(lMatch)
+
+method ResolveRef(cRef as character,cPath as character) class JSONValidator
+    local hRefSchema as hash
+    if (Left(cRef,1)=="#")
+        hRefSchema:=self:ResolveInternalRef(cRef,cPath)
+    else
+        hRefSchema:=self:ResolveExternalRef(cRef,cPath)
+    endif
+    return(hRefSchema)
+
+method ResolveInternalRef(cRef as character,cPath as character) class JSONValidator
+
+    local aKeys as array
+
+    local cKey as character
+    local cFullKey as character:=""
+
+    local hRefSchema as hash
+
+    aKeys:=hb_ATokens(cRef,"/")
+
+    for each cKey in aKeys
+        if (cKey:__enumIndex()==1)//#
+            loop
+        endif
+        cFullKey+="["
+        cFullKey+=hb_JSONEncode(cKey)
+        cFullKey+="]"
+    next each
+
+    private m__hRefSchema as hash
+    M->m__hRefSchema:=hb_HMerge({=>},self:hSchema)
+
+    begin sequence
+        M->m__hRefSchema:=&("M->m__hRefSchema"+cFullKey)
+        hRefSchema:=hb_HMerge({=>},M->m__hRefSchema)
+    recover
+        hRefSchema:={=>}
+        self:AddError("Invalid JSON $Ref Schema provided at "+cPath+". $Ref:"+cRef)
+    end sequence
+
+    return(hRefSchema)
+
+method ResolveExternalRef(cRef as character,cPath as character) class JSONValidator
+    //TODO:ResolveExternalRef
+    self:AddError("Invalid JSON $Ref Schema provided at "+cPath+". $Ref:"+cRef)
+    return({=>})
 
 static function __HB2JSON(cType as character)
     local cResult as character

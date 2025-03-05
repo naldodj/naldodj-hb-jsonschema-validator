@@ -34,12 +34,14 @@
     - [x] "uniqueItems"
     - [ ] "allOf"
     - [ ] "anyOf"
-    - [ ] "oneOf" 
+    - [ ] "oneOf"
     - [x] "prefixItems"
 - [ ] "type": ["object"](https://json-schema.org/understanding-json-schema/reference/object)
 - [ ] "type": ["boolean"](https://json-schema.org/understanding-json-schema/reference/boolean)
-- [ ] "$ref"
-- [ ] "$defs"
+- [x] "$ref"
+    - [x] "Internal"
+        - [x] "$defs"
+    - [ ] "External"
 
 ### Done ✔
 
