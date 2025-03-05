@@ -850,31 +850,37 @@ method ResolveInternalRef(cRef as character,cPath as character) class JSONValida
     local aKeys as array
 
     local cKey as character
-    local cFullKey as character:=""
+    local cFullKey as character
 
     local hRefSchema as hash
 
-    aKeys:=hb_ATokens(cRef,"/")
-
-    for each cKey in aKeys
-        if (cKey:__enumIndex()==1)//#
-            loop
-        endif
-        cFullKey+="["
-        cFullKey+=hb_JSONEncode(cKey)
-        cFullKey+="]"
-    next each
-
-    private m__hRefSchema as hash
-    M->m__hRefSchema:=hb_HMerge({=>},self:hSchema)
-
-    begin sequence
-        M->m__hRefSchema:=&("M->m__hRefSchema"+cFullKey)
-        hRefSchema:=hb_HMerge({=>},M->m__hRefSchema)
-    recover
-        hRefSchema:={=>}
-        self:AddError("Invalid JSON $Ref Schema provided at "+cPath+". $Ref:"+cRef)
-    end sequence
+    if (cRef=="#")
+        hRefSchema:=hb_HMerge({=>},self:hSchema)
+    else
+        aKeys:=hb_ATokens(cRef,"/")
+        cFullKey:=""
+        for each cKey in aKeys
+            if (cKey:__enumIndex()==1)//#
+                loop
+            endif
+            cFullKey+="["
+            cFullKey+=hb_JSONEncode(cKey)
+            cFullKey+="]"
+        next each
+        begin sequence
+            if (!Empty(cFullKey))
+                private m__hRefSchema as hash
+                M->m__hRefSchema:=hb_HMerge({=>},self:hSchema)
+                M->m__hRefSchema:=&("M->m__hRefSchema"+cFullKey)
+                hRefSchema:=hb_HMerge({=>},M->m__hRefSchema)
+            else
+                hRefSchema:=hb_HMerge({=>},self:hSchema)
+            endif
+        recover
+            hRefSchema:={=>}
+            self:AddError("Invalid JSON $Ref Schema provided at "+cPath+". $Ref:"+cRef)
+        end sequence
+    endif
 
     return(hRefSchema)
 
