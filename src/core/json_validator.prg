@@ -1,25 +1,25 @@
 /*
 
- _      _           _                                   _  _      _         _
-| |__  | |__       (_) ___   ___   _ __  __   __  __ _ | |(_)  __| |  __ _ | |_   ___   _ __
-| '_ \ | '_ \      | |/ __| / _ \ | '_ \ \ \ / / / _` || || | / _` | / _` || __| / _ \ | '__|
-| | | || |_) | _   | |\__ \| (_) || | | | \ V / | (_| || || || (_| || (_| || |_ | (_) || |
-|_| |_||_.__/ (_) _/ ||___/ \___/ |_| |_|  \_/   \__,_||_||_| \__,_| \__,_| \__| \___/ |_|
-                 |__/
+   _                                _                                            _  _      _         _
+  (_) ___   ___   _ __   ___   ___ | |__    ___  _ __ ___    __ _ __   __  __ _ | |(_)  __| |  __ _ | |_   ___   _ __
+  | |/ __| / _ \ | '_ \ / __| / __|| '_ \  / _ \| '_ ` _ \  / _` |\ \ / / / _` || || | / _` | / _` || __| / _ \ | '__|
+  | |\__ \| (_) || | | |\__ \| (__ | | | ||  __/| | | | | || (_| | \ V / | (_| || || || (_| || (_| || |_ | (_) || |
+ _/ ||___/ \___/ |_| |_||___/ \___||_| |_| \___||_| |_| |_| \__,_|  \_/   \__,_||_||_| \__,_| \__,_| \__| \___/ |_|
+|__/
 
     Released to Public Domain.
     --------------------------------------------------------------------------------------
 */
 
+#include "hbcurl.ch"
 #include "hbclass.ch"
 
-#ifndef HB_SYMBOL_UNUSED
-    #define HB_SYMBOL_UNUSED( symbol )  ( symbol := ( symbol ) )
-#endif
+#require "hbssl"
+#require "hbtip"
 
 memvar m__hRefSchema
 
-class JSONValidator
+class JSONSchemaValidator
 
 #ifndef __ALT_D__
     HIDDEN:
@@ -31,6 +31,7 @@ class JSONValidator
     data cSchema as character init ""
 
     data hSchema as hash init {=>}
+    data hRefSchema as hash init {=>}
     data hRegexMatch as hash init {=>}
 
     data lFastMode as logical init .T.
@@ -42,22 +43,23 @@ class JSONValidator
 //-----------------------------------------------------------------------
     method AddError(cError)
 
-    method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) as logical
-    method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character) as logical
-    method CheckEnum(xValue as anytype,aEnum as array,cPath as character) as logical
-    method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) as logical
-    method CheckPattern(cValue as character,cPattern as character,cPath as character) as logical
-    method CheckRequired(hData as hash,aRequired as array,cPath as character) as logical
-    method CheckString(cValue as numeric,hSchema as hash,cPath as character) as logical
-    method CheckType(xValue as anytype,xType as anytype,cPath as character) as logical
+    method CheckArrayItems(aValues as array,hSchema as hash,cNode as character) as logical
+    method CheckArrayPrefixItems(aValues as array,hSchema as hash,cNode as character) as logical
+    method CheckEnum(xValue as anytype,aEnum as array,cNode as character) as logical
+    method CheckFormat(cValue as character,cFormat as character,cNode as character) as logical
+    method CheckNumber(nValue as numeric,hSchema as hash,cNode as character) as logical
+    method CheckPattern(cValue as character,cPattern as character,cNode as character) as logical
+    method CheckRequired(hData as hash,aRequired as array,cNode as character) as logical
+    method CheckString(cValue as numeric,hSchema as hash,cNode as character) as logical
+    method CheckType(xValue as anytype,xType as anytype,cNode as character) as logical
 
-    method ValidateObject(xData as anytype,hSchema as hash,cPath as character) as logical
+    method ValidateObject(xData as anytype,hSchema as hash,cNode as character) as logical
 
-    method RegexMatch(cString as character,cPattern as character) as character
+    method RegexMatch(cString as character,cPattern as character,lOnlyCompile as logical) as character
 
-    method ResolveRef(cRef as character,cPath as character) as hash
-    method ResolveInternalRef(cRef as character,cPath as character) as hash
-    method ResolveExternalRef(cRef as character,cPath as character) as hash
+    method ResolveRef(cRef as character,cNode as character) as hash
+    method ResolveInternalRef(cRef as character,cNode as character) as hash
+    method ResolveExternalRef(cRef as character,cNode as character) as hash
 
 //-----------------------------------------------------------------------
 
@@ -76,11 +78,11 @@ class JSONValidator
 
 endclass
 
-method New(cSchema as character) class JSONValidator
+method New(cSchema as character) class JSONSchemaValidator
     self:SetSchema(cSchema)
     return(self)
 
-method procedure AddError(cError) class JSONValidator
+method procedure AddError(cError) class JSONSchemaValidator
     if (!self:lOnlyCheck)
         aAdd(self:aErrors,cError)
     else
@@ -88,7 +90,7 @@ method procedure AddError(cError) class JSONValidator
     endif
     return
 
-method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) class JSONValidator
+method CheckArrayItems(aValues as array,hSchema as hash,cNode as character) class JSONSchemaValidator
 
     local cItemPath as character
 
@@ -107,14 +109,14 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
     local nContainsCount as numeric:=0
 
 
-    hb_Default(@cPath,"root")
+    hb_Default(@cNode,"root")
 
     if (lUniqueItems)
         hUniqueItems:={=>}
     endif
 
     if (lHasRef)
-        hSchemaItems:=self:ResolveRef(hSchema["items"]["$ref"],cPath)
+        hSchemaItems:=self:ResolveRef(hSchema["items"]["$ref"],cNode)
     else
         hSchemaItems:=hSchema["items"]
     endif
@@ -122,7 +124,7 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
     begin sequence
 
         for nItem:=1 to nItems
-            cItemPath:=(cPath+".item("+hb_NToC(nItem)+")")
+            cItemPath:=(cNode+".item("+hb_NToC(nItem)+")")
             if (!self:ValidateObject(aValues[nItem],hSchemaItems,cItemPath))
                 lValid:=.F.
                 if (self:lFastMode)
@@ -151,10 +153,10 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
                 )
                     lValid:=.F.
                     if (self:lFastMode)
-                        self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
+                        self:AddError("Array at "+cNode+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
                         break
                     endif
-                    self:AddError("Array at "+cPath+".Item("+hb_NToC(nItem)+") contains duplicate item: ("+hb_JSONEncode(aValues[nItem])+"). All items must be unique as per schema 'uniqueItems' requirement.")
+                    self:AddError("Array at "+cNode+".Item("+hb_NToC(nItem)+") contains duplicate item: ("+hb_JSONEncode(aValues[nItem])+"). All items must be unique as per schema 'uniqueItems' requirement.")
                 endif
             endif
         next nItem
@@ -165,20 +167,20 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
             aSize(self:aOnlyCheck,0)
             if ((hb_HHasKey(hSchema,"minContains").and.(nContainsCount<hSchema["minContains"])))
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" has too few items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+                self:AddError("Array at "+cNode+" has too few items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
                 if (self:lFastMode)
                     break
                 endif
             elseif (nContainsCount<1)  // Default: at least 1 item
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" does not contain at least one item satisfying 'contains'.")
+                self:AddError("Array at "+cNode+" does not contain at least one item satisfying 'contains'.")
                 if (self:lFastMode)
                     break
                 endif
             endif
             if (hb_HHasKey(hSchema,"maxContains").and.(nContainsCount>hSchema["maxContains"]))
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" has too many items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+                self:AddError("Array at "+cNode+" has too many items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
                 if (self:lFastMode)
                     break
                 endif
@@ -188,7 +190,7 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
         if (hb_HHasKey(hSchema,"minItems"))
             if (nItems<hSchema["minItems"])
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
+                self:AddError("Array at "+cNode+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -198,7 +200,7 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
         if (hb_HHasKey(hSchema,"maxItems"))
             if (nItems>hSchema["maxItems"])
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
+                self:AddError("Array at "+cNode+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -209,7 +211,7 @@ method CheckArrayItems(aValues as array,hSchema as hash,cPath as character) clas
 
     return(lValid)
 
-method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character) class JSONValidator
+method CheckArrayPrefixItems(aValues as array,hSchema as hash,cNode as character) class JSONSchemaValidator
 
     local aPrefixItems as array:=hSchema["prefixItems"]
     local aAdditionalValues as array
@@ -233,7 +235,7 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
     local nContainsCount as numeric:=0
     local nAdditionalValues as numeric
 
-    hb_Default(@cPath,"root")
+    hb_Default(@cNode,"root")
 
     if (lUniqueItems)
         hUniqueItems:={=>}
@@ -242,7 +244,7 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
     begin sequence
 
         for nItem:=1 to Min(nItems,nPrefixItems)
-            cItemPath:=(cPath+".item("+hb_NToC(nItem)+")")
+            cItemPath:=(cNode+".item("+hb_NToC(nItem)+")")
             lHasRef:=hb_HHasKey(aPrefixItems[nItem],"$ref")
             if (lHasRef)
                 hSchemaItems:=self:ResolveRef(aPrefixItems[nItem]["$ref"],cItemPath)
@@ -277,10 +279,10 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
                 )
                     lValid:=.F.
                     if (self:lFastMode)
-                        self:AddError("Array at "+cPath+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
+                        self:AddError("Array at "+cNode+" contains duplicate items. All items must be unique as per schema 'uniqueItems' requirement.")
                         break
                     endif
-                    self:AddError("Array at "+cPath+".Item("+hb_NToC(nItem)+") contains duplicate item: ("+hb_JSONEncode(aValues[nItem])+"). All items must be unique as per schema 'uniqueItems' requirement.")
+                    self:AddError("Array at "+cNode+".Item("+hb_NToC(nItem)+") contains duplicate item: ("+hb_JSONEncode(aValues[nItem])+"). All items must be unique as per schema 'uniqueItems' requirement.")
                 endif
             endif
         next nItem
@@ -292,14 +294,14 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
             nAdditionalValues:=(nItems-nPrefixItems)
             if ((cItemType=="L").and.(!hSchema["items"]))
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" does not allow additional items. Extra items found: "+hb_NToC(nAdditionalValues))
+                self:AddError("Array at "+cNode+" does not allow additional items. Extra items found: "+hb_NToC(nAdditionalValues))
                 if (self:lFastMode)
                     break
                 endif
             elseif (cItemType=="H")
                 //Additional Items
                 aAdditionalValues:=aCopy(aValues,Array(nAdditionalValues),(nPrefixItems+1),nAdditionalValues)
-                if (!self:CheckArrayItems(aAdditionalValues,hSchema,cPath))
+                if (!self:CheckArrayItems(aAdditionalValues,hSchema,cNode))
                     if (self:lFastMode)
                         break
                     endif
@@ -313,20 +315,20 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
             aSize(self:aOnlyCheck,0)
             if ((hb_HHasKey(hSchema,"minContains").and.(nContainsCount<hSchema["minContains"])))
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" has too few items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+                self:AddError("Array at "+cNode+" has too few items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
                 if (self:lFastMode)
                     break
                 endif
             elseif (nContainsCount<1)  // Default: at least 1 item
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" does not contain at least one item satisfying 'contains'.")
+                self:AddError("Array at "+cNode+" does not contain at least one item satisfying 'contains'.")
                 if (self:lFastMode)
                     break
                 endif
             endif
             if (hb_HHasKey(hSchema,"maxContains").and.(nContainsCount>hSchema["maxContains"]))
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" has too many items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
+                self:AddError("Array at "+cNode+" has too many items satisfying 'contains'. Found: "+hb_NToC(nContainsCount))
                 if (self:lFastMode)
                     break
                 endif
@@ -336,7 +338,7 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
         if (hb_HHasKey(hSchema,"minItems"))
             if (nItems<hSchema["minItems"])
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
+                self:AddError("Array at "+cNode+" has too few items. Found: "+hb_NToC(nItems)+", Minimum: "+hb_NToC(hSchema["minItems"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -346,7 +348,7 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
         if (hb_HHasKey(hSchema,"maxItems"))
             if (nItems>hSchema["maxItems"])
                 lValid:=.F.
-                self:AddError("Array at "+cPath+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
+                self:AddError("Array at "+cNode+" has too many items. Found: "+hb_NToC(nItems)+", Maximum: "+hb_NToC(hSchema["maxItems"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -357,7 +359,7 @@ method CheckArrayPrefixItems(aValues as array,hSchema as hash,cPath as character
 
     return(lValid)
 
-method CheckEnum(xValue as anytype,aEnum as array,cPath as character) class JSONValidator
+method CheckEnum(xValue as anytype,aEnum as array,cNode as character) class JSONSchemaValidator
     local cEnumType as character
     local cValueType as character:=valType(xValue)
     local lValid as logical:=.F.
@@ -367,7 +369,7 @@ method CheckEnum(xValue as anytype,aEnum as array,cPath as character) class JSON
         if ((hb_IsHash(aEnum[i])).and.(hb_HHasKey(aEnum[i],"pattern")))
             // Check pattern, if present
             self:lOnlyCheck:=.T.
-                lValid:=self:CheckPattern(xValue,aEnum[i]["pattern"],cPath)
+                lValid:=self:CheckPattern(xValue,aEnum[i]["pattern"],cNode)
             self:lOnlyCheck:=lOnlyCheck
             if (lValid)
                 exit
@@ -383,11 +385,73 @@ method CheckEnum(xValue as anytype,aEnum as array,cPath as character) class JSON
         endif
     next i
     if (!lValid)
-        self:AddError("Invalid enum value at "+cPath+". Value: "+hb_JSONEncode(xValue)+", Allowed values: "+hb_JSONEncode(aEnum))
+        self:AddError("Invalid enum value at "+cNode+". Value: "+hb_JSONEncode(xValue)+", Allowed values: "+hb_JSONEncode(aEnum))
     endif
     return(lValid)
 
-method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) class JSONValidator
+method CheckFormat(cValue as character,cFormat as character,cNode as character) class JSONSchemaValidator
+
+    local cPattern as character
+
+    local lValid as logical
+
+    hb_Default(@cNode,"root")
+
+    switch Lower(cFormat)
+        case "date-time"//ISO 8601
+            cPattern:="^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})$"
+            exit
+        case "date"//ISO 8601
+            cPattern:="^\d{4}-\d{2}-\d{2}$"
+            exit
+        case "time"//ISO 8601
+            cPattern:="^\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+-]\d{2}:\d{2})?$"
+            exit
+        case "duration"//ISO 8601
+            cPattern:="^P(?=\d|T\d)(\d+Y)?(\d+M)?(\d+W)?(\d+D)?(T(\d+H)?(\d+M)?(\d+S)?)?$"
+            exit
+        case "email"//RFC 5322
+            cPattern:="^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$"
+            exit
+        case "idn-email"//RFC 5322
+            cPattern:="^[\p{L}\p{N}._%+-]+@[\p{L}\p{N}.-]+\.[\p{L}]{2,}$"
+            exit
+        case "hostname"//RFC 1034
+            cPattern:="^(?=.{1,253}$)(?!-)[a-zA-Z0-9-]{1,63}(?<!-)(\.[a-zA-Z0-9-]{1,63})*$"
+            exit
+        case "ipv4"
+            cPattern:="^(?:\d{1,3}\.){3}\d{1,3}$"
+            exit
+        case "ipv6"
+            cPattern:="^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$"
+            exit
+        case "uuid" //RFC 4122
+            cPattern:="^([0-9a-fA-F]{1,4}:){7}[0-9a-fA-F]{1,4}$"
+            exit
+        case "uri" //RFC 3986
+            cPattern:="^[a-zA-Z][a-zA-Z0-9+.-]*:[^\s]*$"
+            exit
+        case "uri-reference" //RFC 3986
+            cPattern:="^[a-zA-Z][a-zA-Z0-9+.-]*:[^\s]*|^[^\s]*$"
+            exit
+        otherwise
+            if (self:RegexMatch("",cFormat,.T.))
+                cPattern:=cFormat
+            endif
+    end switch
+
+    if (!Empty(cPattern))
+        lValid:=self:RegexMatch(cValue,cPattern,.F.)
+        if (!lValid)
+            self:AddError("Format mismatch at "+cNode+". Value: '"+cValue+"' does not match pattern: '"+cPattern+"'")
+        endif
+    else
+        lValid:=.T.
+    endif
+
+    return(lValid)
+
+method CheckNumber(nValue as numeric,hSchema as hash,cNode as character) class JSONSchemaValidator
 
     local cType as character:=hSchema["type"]
 
@@ -402,14 +466,14 @@ method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) class J
             nTempN:=Int(nValue)
             lValid:=((nValue-nTempN)==0)
             if (!lValid)
-                self:AddError("Type mismatch at " + cPath + ". Expected: " + cType + ", Found: number")
+                self:AddError("Type mismatch at " + cNode + ". Expected: " + cType + ", Found: number")
                 if (self:lFastMode)
                     break
                 endif
             endif
         elseif ((cType!="number").and.(cType!="integer"))
             lValid:=.F.
-            self:AddError("Type mismatch at "+cPath+". Expected: "+cType+", Found: number")
+            self:AddError("Type mismatch at "+cNode+". Expected: "+cType+", Found: number")
             if (self:lFastMode)
                 break
             endif
@@ -421,7 +485,7 @@ method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) class J
             // Check if the result is 'almost' integer (tolerance for floating-point errors)
             lValid:=(Abs(nTempN-Round(nTempN,0))<0.0000001)  // epsilon = 1e-7
             if (!lValid)
-                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is not a multiple of "+hb_JSONEncode(hSchema["multipleOf"]))
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cNode+" is not a multiple of "+hb_JSONEncode(hSchema["multipleOf"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -432,7 +496,7 @@ method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) class J
         if (hb_HHasKey(hSchema,"minimum"))
             if (nValue<hSchema["minimum"])
                 lValid:=.F.
-                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is smaller than minimum: "+hb_JSONEncode(hSchema["minimum"]))
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cNode+" is smaller than minimum: "+hb_JSONEncode(hSchema["minimum"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -443,7 +507,7 @@ method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) class J
         if (hb_HHasKey(hSchema,"maximum"))
             if (nValue>hSchema["maximum"])
                 lValid:=.F.
-                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is bigger than maximum: "+hb_JSONEncode(hSchema["maximum"]))
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cNode+" is bigger than maximum: "+hb_JSONEncode(hSchema["maximum"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -454,7 +518,7 @@ method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) class J
         if (hb_HHasKey(hSchema,"exclusiveMinimum"))
             if (nValue<=hSchema["exclusiveMinimum"])
                 lValid:=.F.
-                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is smaller than or equal to exclusiveMinimum: "+hb_JSONEncode(hSchema["exclusiveMinimum"]))
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cNode+" is smaller than or equal to exclusiveMinimum: "+hb_JSONEncode(hSchema["exclusiveMinimum"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -465,7 +529,7 @@ method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) class J
         if (hb_HHasKey(hSchema,"exclusiveMaximum"))
             if (nValue>=hSchema["exclusiveMaximum"])
                 lValid:=.F.
-                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cPath+" is bigger than or equal to exclusiveMaximum: "+hb_JSONEncode(hSchema["exclusiveMaximum"]))
+                self:AddError("Value "+hb_JSONEncode(nValue)+" at "+cNode+" is bigger than or equal to exclusiveMaximum: "+hb_JSONEncode(hSchema["exclusiveMaximum"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -476,20 +540,20 @@ method CheckNumber(nValue as numeric,hSchema as hash,cPath as character) class J
 
     return(lValid)
 
-method CheckPattern(cValue as character,cPattern as character,cPath as character) class JSONValidator
+method CheckPattern(cValue as character,cPattern as character,cNode as character) class JSONSchemaValidator
 
     local lValid as logical
 
-    hb_Default(@cPath,"root")
+    hb_Default(@cNode,"root")
 
-    lValid:=self:RegexMatch(cValue,cPattern)
+    lValid:=self:RegexMatch(cValue,cPattern,.F.)
     if (!lValid)
-        self:AddError("Pattern mismatch at "+cPath+". Value: '"+cValue+"' does not match pattern: '"+cPattern+"'")
+        self:AddError("Pattern mismatch at "+cNode+". Value: '"+cValue+"' does not match pattern: '"+cPattern+"'")
     endif
 
     return(lValid)
 
-method CheckRequired(hData as hash,aRequired as array,cPath as character) class JSONValidator
+method CheckRequired(hData as hash,aRequired as array,cNode as character) class JSONSchemaValidator
 
     local cProperty as character
 
@@ -497,13 +561,13 @@ method CheckRequired(hData as hash,aRequired as array,cPath as character) class 
 
     local nProperty as numeric
 
-    hb_Default(@cPath,"root")
+    hb_Default(@cNode,"root")
 
     begin sequence
 
         if (!hb_IsHash(hData))
             lValid:=.F.
-            self:AddError("Expected an object at "+cPath+" to check required properties")
+            self:AddError("Expected an object at "+cNode+" to check required properties")
             break
         endif
 
@@ -511,7 +575,7 @@ method CheckRequired(hData as hash,aRequired as array,cPath as character) class 
             cProperty:=aRequired[nProperty]
             if (!hb_HHasKey(hData,cProperty))
                 lValid:=.F.
-                self:AddError("Required property missing at "+cPath+"."+cProperty)
+                self:AddError("Required property missing at "+cNode+"."+cProperty)
                 if (self:lFastMode)
                     break
                 endif
@@ -522,7 +586,7 @@ method CheckRequired(hData as hash,aRequired as array,cPath as character) class 
 
     return(lValid)
 
-method CheckString(cValue as numeric,hSchema as hash,cPath as character) class JSONValidator
+method CheckString(cValue as numeric,hSchema as hash,cNode as character) class JSONSchemaValidator
 
     local lValid as logical:=.T.
 
@@ -534,7 +598,7 @@ method CheckString(cValue as numeric,hSchema as hash,cPath as character) class J
         if (hb_HHasKey(hSchema,"minLength"))
             if (nLen<hSchema["minLength"])
                 lValid:=.F.
-                self:AddError("Lenght ("+hb_NToC(nLen)+") of string "+hb_JSONEncode(cValue)+" at "+cPath+" is smaller than minLength: "+hb_JSONEncode(hSchema["minLength"]))
+                self:AddError("Lenght ("+hb_NToC(nLen)+") of string "+hb_JSONEncode(cValue)+" at "+cNode+" is smaller than minLength: "+hb_JSONEncode(hSchema["minLength"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -545,7 +609,7 @@ method CheckString(cValue as numeric,hSchema as hash,cPath as character) class J
         if (hb_HHasKey(hSchema,"maxLength"))
             if (nLen>hSchema["maxLength"])
                 lValid:=.F.
-                self:AddError("Lenght ("+hb_NToC(nLen)+") of string "+hb_JSONEncode(cValue)+" at "+cPath+" is bigger than maxLength: "+hb_JSONEncode(hSchema["maxLength"]))
+                self:AddError("Lenght ("+hb_NToC(nLen)+") of string "+hb_JSONEncode(cValue)+" at "+cNode+" is bigger than maxLength: "+hb_JSONEncode(hSchema["maxLength"]))
                 if (self:lFastMode)
                     break
                 endif
@@ -554,14 +618,14 @@ method CheckString(cValue as numeric,hSchema as hash,cPath as character) class J
 
         // Check pattern, if present
         if (hb_HHasKey(hSchema,"pattern"))
-            lValid:=self:CheckPattern(cValue,hSchema["pattern"],cPath)
+            lValid:=self:CheckPattern(cValue,hSchema["pattern"],cNode)
         endif
 
     end sequence
 
     return(lValid)
 
-method CheckType(xValue as anytype,xType as anytype,cPath as character) class JSONValidator
+method CheckType(xValue as anytype,xType as anytype,cNode as character) class JSONSchemaValidator
 
     local cType as character
     local cValueType as character:=ValType(xValue)
@@ -594,7 +658,7 @@ method CheckType(xValue as anytype,xType as anytype,cPath as character) class JS
                 exit
         end switch
         if (!lResult)
-            self:AddError("Type mismatch at "+cPath+". Expected: "+cType+", Found: "+__HB2JSON(cValueType))
+            self:AddError("Type mismatch at "+cNode+". Expected: "+cType+", Found: "+__HB2JSON(cValueType))
         endif
     elseif (cType=="A")
         // Array de tipos
@@ -602,21 +666,21 @@ method CheckType(xValue as anytype,xType as anytype,cPath as character) class JS
         cValueType:=__HB2JSON(cValueType)
         lResult:=(cValueType$cType)
         if (!lResult)
-            self:AddError( "Type mismatch at "+cPath+". Expected: one of: "+cType+", Found: "+cValueType)
+            self:AddError( "Type mismatch at "+cNode+". Expected: one of: "+cType+", Found: "+cValueType)
         endif
     else
         // Tipo inválido para cType
-        self:AddError( "Invalid type specification at "+cPath+". Expected string or array of strings, Got "+__HB2JSON(cType))
+        self:AddError( "Invalid type specification at "+cNode+". Expected string or array of strings, Got "+__HB2JSON(cType))
         lResult:=.F.
     endif
 
     return(lResult)
 
-method Reset(cSchema as character) class JSONValidator
+method Reset(cSchema as character) class JSONSchemaValidator
     hb_default(@cSchema,self:cSchema)
     return(self:SetSchema(cSchema))
 
-method SetSchema(cSchema as character) class JSONValidator
+method SetSchema(cSchema as character) class JSONSchemaValidator
     local nLengthDecoded as numeric
     aSize(self:aErrors,0)
     aSize(self:aOnlyCheck,0)
@@ -633,16 +697,16 @@ method SetSchema(cSchema as character) class JSONValidator
     endif
     return(!self:lHasError)
 
-method SetFastMode(lFastMode as logical) class JSONValidator
+method SetFastMode(lFastMode as logical) class JSONSchemaValidator
     local lValue as logical:=self:lFastMode
     self:lFastMode:=lFastMode
     return(lValue)
 
-method Validate(cJSONData as character) class JSONValidator
+method Validate(cJSONData as character) class JSONSchemaValidator
     local nLengthDecoded as numeric
     begin sequence
         nLengthDecoded:=hb_JSONDecode(cJSONData,@self:xJSONData)
-        if (((nLengthDecoded==0).or.(!ValType(self:xJSONData)$"A|C|H|L|N")))
+        if (((nLengthDecoded==0).or.(!ValType(self:xJSONData)$"A|C|H|L|N|U")))
             self:AddError("Invalid JSON data provided")
             break
         endif
@@ -651,7 +715,7 @@ method Validate(cJSONData as character) class JSONValidator
     self:lHasError:=(!Empty(self:aErrors))
     return(!self:lHasError)
 
-method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class JSONValidator
+method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class JSONSchemaValidator
 
     local aRequired as array
 
@@ -660,27 +724,42 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
     local cPropertyPath as character
 
     local hProperties as hash
+
+    local hItemsSchema as hash
     local hPropertySchema as hash
+    local hPrefixItemsSchema as hash
 
     local lValid as logical
     local lHasRef as logical
 
     local xType as anytype
 
-    hb_Default(@cPath,"root")
+    hb_Default(@cNode,"root")
 
     begin sequence
 
         if (hb_HHasKey(hSchema,"type"))
             xType:=hSchema["type"]
-            lValid:=self:CheckType(xData,xType,cPath)
+            lValid:=self:CheckType(xData,xType,cNode)
             if (!lValid)
                 break
             endif
         endif
 
+        if (hb_HHasKey(hSchema,"format"))
+            if (!self:CheckFormat(xData,hSchema["format"],cNode))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        endif
+
         if (hb_HHasKey(hSchema,"enum"))
-            self:CheckEnum(xData,hSchema["enum"],cPath)
+            if (!self:CheckEnum(xData,hSchema["enum"],cNode))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
         endif
 
         if (hb_IsString(xType))
@@ -688,13 +767,13 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
             switch Lower(cType)
                 case "array"
                     if (hb_HHasKey(hSchema,"prefixItems"))
-                        if (!self:CheckArrayPrefixItems(xData,hSchema,cPath))
+                        if (!self:CheckArrayPrefixItems(xData,hSchema,cNode))
                             if (self:lFastMode)
                                 break
                             endif
                         endif
                     elseif (hb_HHasKey(hSchema,"items"))
-                        if (!self:CheckArrayItems(xData,hSchema,cPath))
+                        if (!self:CheckArrayItems(xData,hSchema,cNode))
                             if (self:lFastMode)
                                 break
                             endif
@@ -702,7 +781,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
                     endif
                     exit
                 case "string"
-                    if (!self:CheckString(xData,hSchema,cPath))
+                    if (!self:CheckString(xData,hSchema,cNode))
                         if (self:lFastMode)
                             break
                         endif
@@ -712,7 +791,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
                     exit
                 case "integer"
                 case "number"
-                    if (!self:CheckNumber(xData,hSchema,cPath))
+                    if (!self:CheckNumber(xData,hSchema,cNode))
                         if (self:lFastMode)
                             break
                         endif
@@ -727,7 +806,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
 
         if (hb_HHasKey(hSchema,"required"))
             aRequired:=hSchema["required"]
-            if (!self:CheckRequired(xData,aRequired,cPath))
+            if (!self:CheckRequired(xData,aRequired,cNode))
                 if (self:lFastMode)
                     break
                 endif
@@ -741,7 +820,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
         hProperties:=hSchema["properties"]
         for each cProperty in hb_HKeys(hProperties)
             if (hb_HHasKey(xData,cProperty))
-                cPropertyPath:=(cPath+"."+cProperty)
+                cPropertyPath:=(cNode+"."+cProperty)
                 lHasRef:=hb_HHasKey(hProperties[cProperty],"$ref")
                 if (lHasRef)
                     hPropertySchema:=self:ResolveRef(hProperties[cProperty]["$ref"],cPropertyPath)
@@ -757,8 +836,8 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
                         endif
                         loop
                     endif
-                    if (hb_HHasKey(hProperties[cProperty],"enum"))
-                        if (!self:CheckEnum(xData[cProperty],hProperties[cProperty]["enum"],cPropertyPath))
+                    if (hb_HHasKey(hPropertySchema,"enum"))
+                        if (!self:CheckEnum(xData[cProperty],hPropertySchema["enum"],cPropertyPath))
                             if (self:lFastMode)
                                 break
                             endif
@@ -768,29 +847,45 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
                         cType:=xType
                         switch Lower(cType)
                             case "array"
-                                if (hb_HHasKey(hProperties[cProperty],"prefixItems"))
-                                    if (!self:CheckArrayPrefixItems(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                if (hb_HHasKey(hPropertySchema,"prefixItems"))
+                                    hPrefixItemsSchema:=hPropertySchema
+                                elseif (hb_HHasKey(hProperties[cProperty],"prefixItems"))
+                                    hPrefixItemsSchema:=hProperties[cProperty]
+                                else
+                                    hPrefixItemsSchema:={=>}
+                                endif
+                                if (hb_HHasKey(hPrefixItemsSchema,"prefixItems"))
+                                    if (!self:CheckArrayPrefixItems(xData[cProperty],hPrefixItemsSchema,cPropertyPath))
                                         if (self:lFastMode)
                                             break
                                         endif
                                     endif
-                                elseif (hb_HHasKey(hProperties[cProperty],"items"))
-                                    if (!self:CheckArrayItems(xData[cProperty],hProperties[cProperty],cPropertyPath))
-                                        if (self:lFastMode)
-                                            break
+                                else
+                                    if (hb_HHasKey(hPropertySchema,"items"))
+                                        hItemsSchema:=hPropertySchema
+                                    elseif (hb_HHasKey(hProperties[cProperty],"items"))
+                                        hItemsSchema:=hProperties[cProperty]
+                                    else
+                                        hItemsSchema:={=>}
+                                    endif
+                                    if (hb_HHasKey(hItemsSchema,"items"))
+                                        if (!self:CheckArrayItems(xData[cProperty],hItemsSchema,cPropertyPath))
+                                            if (self:lFastMode)
+                                                break
+                                            endif
                                         endif
                                     endif
                                 endif
                                 exit
                             case "string"
-                                if (!self:CheckString(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                if (!self:CheckString(xData[cProperty],hPropertySchema,cPropertyPath))
                                     if (self:lFastMode)
                                         break
                                     endif
                                 endif
                                 exit
                             case "object"
-                                if (!self:ValidateObject(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                if (!self:ValidateObject(xData[cProperty],hPropertySchema,cPropertyPath))
                                     if (self:lFastMode)
                                         break
                                     endif
@@ -798,13 +893,20 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
                                 exit
                             case "integer"
                             case "number"
-                                if (!self:CheckNumber(xData[cProperty],hProperties[cProperty],cPropertyPath))
+                                if (!self:CheckNumber(xData[cProperty],hPropertySchema,cPropertyPath))
                                     if (self:lFastMode)
                                         break
                                     endif
                                 endif
                                 exit
                         end switch
+                    endif
+                endif
+                if (hb_HHasKey(hPropertySchema,"format"))
+                    if (!self:CheckFormat(xData[cProperty],hPropertySchema["format"],cPropertyPath))
+                        if (self:lFastMode)
+                            break
+                        endif
                     endif
                 endif
             endif
@@ -816,36 +918,44 @@ method ValidateObject(xData as anytype,hSchema as hash,cPath as character) class
 
     return(!self:lHasError)
 
-method RegexMatch(cString as character,cPattern as character) class JSONValidator
+method RegexMatch(cString as character,cPattern as character,lOnlyCompile as logical) class JSONSchemaValidator
 
     local aMatch as array
 
     local lMatch as logical
+    local lRegexComp as logical
 
     local pRegex as pointer
 
     if (hb_HHasKey(self:hRegexMatch,cPattern))
         pRegex:=self:hRegexMatch[cPattern]
+        lRegexComp:=.T.
     else
         pRegex:=hb_regexComp(cPattern,.T./* case-sensitive */,.F./* no multiline */)
-        self:hRegexMatch[cPattern]:=pRegex
+        lRegexComp:=(!Empty(pRegex))
+        if (lRegexComp)
+            self:hRegexMatch[cPattern]:=pRegex
+        endif
     endif
 
-    aMatch:=hb_regex(pRegex,cString,.T./* case-sensitive */)
-    lMatch:=(!Empty(aMatch))
+    if (lRegexComp)
+        aMatch:=hb_regex(pRegex,cString,.T./* case-sensitive */)
+    endif
+
+    lMatch:=if(lOnlyCompile,lRegexComp,(!Empty(aMatch)))
 
     return(lMatch)
 
-method ResolveRef(cRef as character,cPath as character) class JSONValidator
+method ResolveRef(cRef as character,cNode as character) class JSONSchemaValidator
     local hRefSchema as hash
     if (Left(cRef,1)=="#")
-        hRefSchema:=self:ResolveInternalRef(cRef,cPath)
+        hRefSchema:=self:ResolveInternalRef(cRef,cNode)
     else
-        hRefSchema:=self:ResolveExternalRef(cRef,cPath)
+        hRefSchema:=self:ResolveExternalRef(cRef,cNode)
     endif
     return(hRefSchema)
 
-method ResolveInternalRef(cRef as character,cPath as character) class JSONValidator
+method ResolveInternalRef(cRef as character,cNode as character) class JSONSchemaValidator
 
     local aKeys as array
 
@@ -854,40 +964,206 @@ method ResolveInternalRef(cRef as character,cPath as character) class JSONValida
 
     local hRefSchema as hash
 
-    if (cRef=="#")
-        hRefSchema:=hb_HMerge({=>},self:hSchema)
+    if (hb_HHasKey(self:hRefSchema,cRef))
+        hRefSchema:=self:hRefSchema[cRef]
     else
-        aKeys:=hb_ATokens(cRef,"/")
-        cFullKey:=""
-        for each cKey in aKeys
-            if (cKey:__enumIndex()==1)//#
-                loop
-            endif
-            cFullKey+="["
-            cFullKey+=hb_JSONEncode(cKey)
-            cFullKey+="]"
-        next each
-        begin sequence
-            if (!Empty(cFullKey))
-                private m__hRefSchema as hash
-                M->m__hRefSchema:=hb_HMerge({=>},self:hSchema)
-                M->m__hRefSchema:=&("M->m__hRefSchema"+cFullKey)
-                hRefSchema:=hb_HMerge({=>},M->m__hRefSchema)
-            else
-                hRefSchema:=hb_HMerge({=>},self:hSchema)
-            endif
-        recover
-            hRefSchema:={=>}
-            self:AddError("Invalid JSON $Ref Schema provided at "+cPath+". $Ref:"+cRef)
-        end sequence
+        if (cRef=="#")
+            hRefSchema:=hb_HMerge({=>},self:hSchema)
+        else
+            aKeys:=hb_ATokens(cRef,"/")
+            cFullKey:=""
+            for each cKey in aKeys
+                if (cKey:__enumIndex()==1)//#
+                    loop
+                endif
+                cFullKey+="["
+                cFullKey+=hb_JSONEncode(cKey)
+                cFullKey+="]"
+            next each
+            begin sequence
+                if (!Empty(cFullKey))
+                    private m__hRefSchema as hash
+                    M->m__hRefSchema:=hb_HMerge({=>},self:hSchema)
+                    M->m__hRefSchema:=&("M->m__hRefSchema"+cFullKey)
+                    hRefSchema:=hb_HMerge({=>},M->m__hRefSchema)
+                else
+                    hRefSchema:=hb_HMerge({=>},self:hSchema)
+                endif
+            recover
+                hRefSchema:={=>}
+                self:AddError("Invalid JSON $Ref Schema provided at "+cNode+". $Ref:"+cRef)
+            end sequence
+        endif
+        self:hRefSchema[cRef]:=hRefSchema
     endif
 
     return(hRefSchema)
 
-method ResolveExternalRef(cRef as character,cPath as character) class JSONValidator
-    //TODO:ResolveExternalRef
-    self:AddError("Invalid JSON $Ref Schema provided at "+cPath+". $Ref:"+cRef)
-    return({=>})
+method ResolveExternalRef(cRef as character,cNode as character) class JSONSchemaValidator
+
+    local cBaseURL as character
+    local cErrorMsg as character
+    local cJSONSchema as character
+
+    local hRefSchema as hash := {=>}
+
+    local oTURL as object
+
+    if (hb_HHasKey(self:hSchema,"$id"))
+        cBaseURL:=self:hSchema["$id"]
+        cBaseURL+=cRef
+    else
+        cBaseURL:=cRef
+    endif
+
+    begin sequence
+
+        if (hb_HHasKey(self:hRefSchema,cBaseURL))
+            hRefSchema:=self:hRefSchema[cBaseURL]
+            break
+        endif
+
+        oTURL:=TUrl():New(cBaseURL)
+
+        switch Lower(oTURL:cProto)
+            case "http"
+            case "https"
+                if (!__GetJSONSchemaByHTTP(oTURL,cNode,cRef,@cJSONSchema,@cErrorMsg))
+                    self:AddError(cErrorMsg)
+                    break
+                endif
+                exit
+            otherwise
+                if (!__GetJSONSchemaByFile(cBaseURL,cNode,cRef,@cJSONSchema,@cErrorMsg))
+                    self:AddError(cErrorMsg)
+                    break
+                endif
+        end switch
+
+        if ((hb_JSONDecode(cJSONSchema,@hRefSchema)==0).or.(!hb_IsHash(hRefSchema)))
+            self:AddError("Invalid JSON $Ref Schema provided at "+cNode+". $Ref:"+cRef+" Failed to fetch external schema from "+cRef)
+            break
+        endif
+
+        self:hRefSchema[cBaseURL]:=hRefSchema
+
+    end sequence
+
+    return(hRefSchema)
+
+static function __GetJSONSchemaByHTTP(oTURL as object,cNode,cRef,/*@*/cJSONSchema as character,/*@*/cErrorMsg)
+
+    local cLastErrorMessage as character
+
+    local lGetJSONSchemaByHTTP as logical
+
+    begin sequence
+
+        lGetJSONSchemaByHTTP:=__cURLGet(oTURL:cAddress,@cJSONSchema,@cLastErrorMessage)
+
+        if (!lGetJSONSchemaByHTTP)
+            cErrorMsg:="Invalid JSON $Ref Schema provided at "+cNode+". $Ref:"+cRef+" Failed to fetch external schema from " + cRef+" "+cLastErrorMessage
+            break
+        endif
+
+        lGetJSONSchemaByHTTP:=(!Empty(cJSONSchema))
+        if (!lGetJSONSchemaByHTTP)
+            cErrorMsg:="Invalid JSON $Ref Schema provided at "+cNode+". $Ref:"+cRef+" Failed to fetch external schema from "+cRef
+            break
+        endif
+
+    end sequence
+
+    return(lGetJSONSchemaByHTTP)
+
+static function __cURLGet(cURL as character,cJSONSchema as character,/*@*/cErrorMsg)
+
+    local aHeader as array
+
+    local lcURLGet as logical
+
+    local nError as numeric
+    local nHTTPCode as numeric
+
+    local phcUrl as pointer
+
+    curl_global_init()
+
+        begin sequence
+
+            lcURLGet:=(!Empty(phcUrl:=curl_easy_init()))
+            if (!lcURLGet)
+                cErrorMsg:="cURL Error"
+                break
+            endif
+
+            begin sequence
+
+                aHeader:=Array(0)
+                aAdd(aHeader,"Content-Type: application/json;charset=utf-8")
+                /*TODO
+                aAdd(aHeader,"Accept-Encoding: gzip,deflate")
+                aAdd(aHeader,"Content-Encoding: gzip")
+                */
+
+                curl_easy_setopt(phcUrl,HB_CURLOPT_HTTPHEADER,aHeader)
+                curl_easy_setopt(phcUrl,HB_CURLOPT_URL,cURL)
+                curl_easy_setopt(phcUrl,HB_CURLOPT_FOLLOWLOCATION,.T.)
+                curl_easy_setopt(phcUrl,HB_CURLOPT_SSL_VERIFYPEER,.F.)
+                curl_easy_setopt(phcUrl,HB_CURLOPT_SSL_VERIFYHOST,.F.)
+                curl_easy_setopt(phcUrl,HB_CURLOPT_NOPROGRESS,.T.)
+                curl_easy_setopt(phcUrl,HB_CURLOPT_VERBOSE,.F.)
+                curl_easy_setopt(phcUrl,HB_CURLOPT_DL_BUFF_SETUP)
+
+                //Sending the request and getting the response
+                lcURLGet:=((nError:=curl_easy_perform(phcUrl))==HB_CURLE_OK)
+                if (!lcURLGet)
+                    cErrorMsg:="cURL Error code: "+hb_NToC(nError)
+                    break
+                endif
+
+                nHTTPCode:=curl_easy_getinfo(phcUrl,HB_CURLINFO_RESPONSE_CODE,@nError)
+
+                lcURLGet:=(nError==HB_CURLE_OK)
+                if (!lcURLGet)
+                    cErrorMsg:="cURL Error code: "+hb_NToC(nError)
+                    break
+                endif
+
+                lcURLGet:=((nHTTPCode>=200).and.(nHTTPCode<=299))
+                if (!lcURLGet)
+                    cErrorMsg:="cURL HTTP Error code: "+hb_NToC(nHTTPCode)
+                endif
+
+                cJSONSchema:=hb_ZUncompress(curl_easy_dl_buff_get(phcUrl))
+                if (empty(cJSONSchema))
+                    cJSONSchema:=curl_easy_dl_buff_get(phcUrl)
+                endif
+
+            end sequence
+
+            curl_easy_cleanup(phcUrl)
+
+        end sequence
+
+    curl_global_cleanup()
+
+    return(lcURLGet)
+
+static function __GetJSONSchemaByFile(cFilePath as character,cNode as character,cRef,/*@*/cJSONSchema,/*@*/cErrorMsg)
+
+    local lGetJSONSchemaByFile as logical
+
+    begin sequence
+        lGetJSONSchemaByFile:=hb_FileExists(cFilePath)
+        if (!lGetJSONSchemaByFile)
+            cErrorMsg:="Invalid JSON $Ref Schema provided at "+cNode+". $Ref:"+cRef+". Schema file not found: "+cFilePath
+            break
+        endif
+        cJSONSchema:=hb_MemoRead(cFilePath)
+    end sequence
+
+    return(lGetJSONSchemaByFile)
 
 static function __HB2JSON(cType as character)
     local cResult as character

@@ -3,6 +3,24 @@
    Entries may not always be in chronological/commit order.
    See license at the end of file. */
 
+2025-03-06 20:50 UTC naldodj (TODO List: $ref)
+  + src/tst/json_validator_tst_12.prg
+  * src/core/json_validator.prg
+  * src/tst/hbmk.hbm
+  * src/tst/json_validator_tst_01.prg
+  * src/tst/json_validator_tst_02.prg
+  * src/tst/json_validator_tst_03.prg
+  * src/tst/json_validator_tst_04.prg
+  * src/tst/json_validator_tst_05.prg
+  * src/tst/json_validator_tst_06.prg
+  * src/tst/json_validator_tst_07.prg
+  * src/tst/json_validator_tst_08.prg
+  * src/tst/json_validator_tst_09.prg
+  * src/tst/json_validator_tst_10.prg
+  * src/tst/json_validator_tst_11.prg
+  * src/tst/json_validator_tst.exe
+  * src/tst/json_validator_tst.prg
+
 2025-03-05 13:25 UTC naldodj (TODO List: $ref)
   * src/core/json_validator.prg
   * src/tst/json_validator_tst.exe

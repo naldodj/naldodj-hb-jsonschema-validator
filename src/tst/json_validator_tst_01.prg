@@ -1,10 +1,10 @@
 /*
 
-   _                                      _  _      _         _                    _         _
-  (_) ___   ___   _ __     __   __  __ _ | |(_)  __| |  __ _ | |_   ___   _ __    | |_  ___ | |_
-  | |/ __| / _ \ | '_ \    \ \ / / / _` || || | / _` | / _` || __| / _ \ | '__|   | __|/ __|| __|
-  | |\__ \| (_) || | | |    \ V / | (_| || || || (_| || (_| || |_ | (_) || |      | |_ \__ \| |_
- _/ ||___/ \___/ |_| |_|     \_/   \__,_||_||_| \__,_| \__,_| \__| \___/ |_|       \__||___/ \__|
+   _                                _                                            _  _      _         _                 _         _
+  (_) ___   ___   _ __   ___   ___ | |__    ___  _ __ ___    __ _ __   __  __ _ | |(_)  __| |  __ _ | |_   ___   _ __ | |_  ___ | |_
+  | |/ __| / _ \ | '_ \ / __| / __|| '_ \  / _ \| '_ ` _ \  / _` |\ \ / / / _` || || | / _` | / _` || __| / _ \ | '__|| __|/ __|| __|
+  | |\__ \| (_) || | | |\__ \| (__ | | | ||  __/| | | | | || (_| | \ V / | (_| || || || (_| || (_| || |_ | (_) || |   | |_ \__ \| |_
+ _/ ||___/ \___/ |_| |_||___/ \___||_| |_| \___||_| |_| |_| \__,_|  \_/   \__,_||_||_| \__,_| \__,_| \__| \___/ |_|    \__||___/ \__|
 |__/
 
     Example usage with valid and invalid test cases.
@@ -19,7 +19,7 @@ static function getTst01()
     cFunName:=ProcName()
 
     // JSON Schema example
-    #pragma __cstream|cSchema:=%s
+    #pragma __cstream|M->cSchema:=%s
 {
     "type": "object",
     "required": [
@@ -73,6 +73,10 @@ static function getTst01()
             "minContains": 1,
             "maxContains": 3,
             "uniqueItems": true
+        },
+        "email": {
+            "type":"string",
+            "format": "email"
         }
     }
 }
@@ -82,7 +86,7 @@ static function getTst01()
     aTests:={;
         {;//1
              "=> Valid case: All fields are correct";
-            ,'{"name": "JOHN B","age": 30,"salary": 15000,"tags": ["product-123"],"address": {"city": "New York","zip": "12345-678"}}';
+            ,'{"name": "JOHN B","age": 30,"salary": 15000,"tags": ["product-123"],"address": {"city": "New York","zip": "12345-678"},"email":"teste@teste.com"}';
             ,.T.;
         };
        ,{;//2
@@ -92,7 +96,7 @@ static function getTst01()
         };
        ,{;//3
              "=> Invalid case: Incorrect type for 'age'";
-            ,'{"name": "ALICE K","age": "thirty","salary": 1501.054,"tags": ["demo"]}';
+            ,'{"name": "ALICE k","age": "thirty","salary": 1501.054,"tags": ["demo"]}';
             ,.F.;
         };
        ,{;//4
@@ -107,7 +111,7 @@ static function getTst01()
         };
        ,{;//6
              "=> Invalid case: 'tags' contains more items than the maximum allowed";
-            ,'{"name": "FRANK M","age": 35,"salary": 15000,"tags": ["product-000","product-001","product-002","product-003","product-004","product-005","product-006","product-007","product-008","product-009","product-010"]}';
+            ,'{"name": "FRANK M","age": 35,"salary": 15000,"tags": ["product-000","product-001","product-002","product-003","product-004","product-005","product-006","product-007","product-008","product-009","product-010"],"email":"@teste.com"}';
             ,.F.;
         };
        ,{;//7
@@ -167,7 +171,7 @@ static function getTst01()
         };
        ,{;//18
              "=> Invalid case: 'name' exceeds the maximum length";
-            ,'{"name": "PEDRO DE ALCÂNTARA JOÃO CARLOS LEOPOLDO SALVADOR BIBIANO FRANCISCO XAVIER DE PAULA LEOCÁDIO MIGUEL GABRIEL RAFAEL GONZAGA","age": '+hb_NToC(DateDiffYear(Date(),SToD("18251202")))+',"salary": 999999,"tags": ["product-000","product-001","product-002"]}';
+            ,'{"name": "PEDRO DE ALCÂNTARA JOÃO CARLOS LEOPOLDO SALVADOR BIBIANO FRANCISCO XAVIER DE PAULA LEOCÁDIO MIGUEL GABRIEL RAFAEL GONZAGA","age": '+hb_NToC(DateDiffYear(Date(),SToD("18251202")))+',"salary": 999999,"tags": ["product-000","product-001","product-002"],"email": "PEDRO DE ALCÂNTARA JOÃO CARLOS LEOPOLDO SALVADOR BIBIANO FRANCISCO XAVIER DE PAULA LEOCÁDIO MIGUEL GABRIEL RAFAEL GONZAGA"}';
             ,.F.;
         };
     }

@@ -1,10 +1,10 @@
 /*
 
-   _                                      _  _      _         _                    _         _
-  (_) ___   ___   _ __     __   __  __ _ | |(_)  __| |  __ _ | |_   ___   _ __    | |_  ___ | |_
-  | |/ __| / _ \ | '_ \    \ \ / / / _` || || | / _` | / _` || __| / _ \ | '__|   | __|/ __|| __|
-  | |\__ \| (_) || | | |    \ V / | (_| || || || (_| || (_| || |_ | (_) || |      | |_ \__ \| |_
- _/ ||___/ \___/ |_| |_|     \_/   \__,_||_||_| \__,_| \__,_| \__| \___/ |_|       \__||___/ \__|
+   _                                _                                            _  _      _         _                 _         _
+  (_) ___   ___   _ __   ___   ___ | |__    ___  _ __ ___    __ _ __   __  __ _ | |(_)  __| |  __ _ | |_   ___   _ __ | |_  ___ | |_
+  | |/ __| / _ \ | '_ \ / __| / __|| '_ \  / _ \| '_ ` _ \  / _` |\ \ / / / _` || || | / _` | / _` || __| / _ \ | '__|| __|/ __|| __|
+  | |\__ \| (_) || | | |\__ \| (__ | | | ||  __/| | | | | || (_| | \ V / | (_| || || || (_| || (_| || |_ | (_) || |   | |_ \__ \| |_
+ _/ ||___/ \___/ |_| |_||___/ \___||_| |_| \___||_| |_| |_| \__,_|  \_/   \__,_||_||_| \__,_| \__,_| \__| \___/ |_|    \__||___/ \__|
 |__/
 
     Example usage with valid and invalid test cases.
@@ -47,36 +47,37 @@ static procedure Execute()
     local nTest as numeric
     local nTestCount as numeric:=0
 
-    local oJSONValidator as object
+    local oJSONSchemaValidator as object
 
     private cSchema as character
     private cFunName as character
 
     aFunTst:=Array(0)
-    aAdd(aFunTst,{@getTst01(),"getTst01",.F.})
-    aAdd(aFunTst,{@getTst02(),"getTst02",.F.})
-    aAdd(aFunTst,{@getTst03(),"getTst03",.F.})
-    aAdd(aFunTst,{@getTst04(),"getTst04",.F.})
-    aAdd(aFunTst,{@getTst05(),"getTst05",.F.})
-    aAdd(aFunTst,{@getTst06(),"getTst06",.F.})
-    aAdd(aFunTst,{@getTst07(),"getTst07",.F.})
-    aAdd(aFunTst,{@getTst08(),"getTst08",.F.})
-    aAdd(aFunTst,{@getTst09(),"getTst09",.F.})
-    aAdd(aFunTst,{@getTst10(),"getTst10",.F.})
-    aAdd(aFunTst,{@getTst11(),"getTst11",.F.})
+    aAdd(aFunTst,{@getTst01(),"getTst01",.T.})
+    aAdd(aFunTst,{@getTst02(),"getTst02",.T.})
+    aAdd(aFunTst,{@getTst03(),"getTst03",.T.})
+    aAdd(aFunTst,{@getTst04(),"getTst04",.T.})
+    aAdd(aFunTst,{@getTst05(),"getTst05",.T.})
+    aAdd(aFunTst,{@getTst06(),"getTst06",.T.})
+    aAdd(aFunTst,{@getTst07(),"getTst07",.T.})
+    aAdd(aFunTst,{@getTst08(),"getTst08",.T.})
+    aAdd(aFunTst,{@getTst09(),"getTst09",.T.})
+    aAdd(aFunTst,{@getTst10(),"getTst10",.T.})
+    aAdd(aFunTst,{@getTst11(),"getTst11",.T.})
+    aAdd(aFunTst,{@getTst12(),"getTst12",.T.})
 
     aColors:=getColors(Len(aFunTst))
 
-    oJSONValidator:=JSONValidator():New("")
-    oJSONValidator:SetFastMode(.F.)
+    oJSONSchemaValidator:=JSONSchemaValidator():New("")
+    oJSONSchemaValidator:SetFastMode(.F.)
 
     for i:=1 to Len(aFunTst)
 
         aTests:=hb_execFromArray(aFunTst[i][1])
 
-        oJSONValidator:SetSchema(cSchema)
+        oJSONSchemaValidator:SetSchema(cSchema)
 
-        lValid:=(!oJSONValidator:HasError())
+        lValid:=(!oJSONSchemaValidator:HasError())
 
         if (lValid)
             SetColor("g+/n")
@@ -86,7 +87,7 @@ static procedure Execute()
             SetColor("r+/n")
             QOut("Result: Invalid JSON Schema. Errors found:")
             SetColor("")
-            aEval(oJSONValidator:GetErros(),{|x| QOut("  "+x)})
+            aEval(oJSONSchemaValidator:GetErros(),{|x| QOut("  "+x)})
         endif
 
         QOut(Replicate("=",80))
@@ -101,7 +102,7 @@ static procedure Execute()
             SetColor("") /* Reset color to default */
 
             cJSON:=aTests[nTest][2]
-            lValid:=oJSONValidator:Validate(cJSON)
+            lValid:=oJSONSchemaValidator:Validate(cJSON)
 
             if (lValid)
                 SetColor("g+/n")
@@ -111,14 +112,14 @@ static procedure Execute()
                 SetColor("r+/n")
                 QOut("Result: Invalid JSON. Errors found:")
                 SetColor("")
-                aEval(oJSONValidator:GetErros(),{|x| QOut("  "+x)})
+                aEval(oJSONSchemaValidator:GetErros(),{|x| QOut("  "+x)})
             endif
 
-            oJSONValidator:Reset()
+            oJSONSchemaValidator:Reset()
 
             // Verify expected outcome
-            aFunTst[i][3]:=(lValid==aTests[nTest][3])
-            if (aFunTst[i][3])
+            aFunTst[i][3]:=((aFunTst[i][3]).and.(lValid==aTests[nTest][3]))
+            if ((lValid==aTests[nTest][3]))
                 SetColor("g+/n")
                 QOut("Test passed: Expected "+if(aTests[nTest][3],"valid","invalid")+", got "+if(lValid,"valid","invalid"))
                 SetColor("")
@@ -193,3 +194,4 @@ static function DateDiffYear(dDate1 as date, dDate2 as date)
 #include "./json_validator_tst_09.prg"
 #include "./json_validator_tst_10.prg"
 #include "./json_validator_tst_11.prg"
+#include "./json_validator_tst_12.prg"
