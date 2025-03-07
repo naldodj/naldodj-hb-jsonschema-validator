@@ -1,8 +1,0 @@
--w3 -es2
-
--cpp
-
-../core/json_validator.prg
-./json_validator_tst.prg
-
--o./${hb_name}
