@@ -12,7 +12,7 @@
     Released to Public Domain.
     --------------------------------------------------------------------------------------
 */
-static function getTst12()
+static function getTst13()
 
     local aTests as array
 
@@ -22,9 +22,9 @@ static function getTst12()
 
     cFunName:=ProcName()
 
-    M->cSchema:=getJSONSchemaTst12()
+    M->cSchema:=getJSONSchemaTst13()
 
-    cData:=getJSONDataTst12()
+    cData:=getJSONDataTst13()
 
     lExpected:=((!Empty(cSchema)).and.(!Empty(cData)))
 
@@ -35,25 +35,97 @@ static function getTst12()
 
     return(aTests)
 
-static function getJSONSchemaTst12(/*@*/cErrorMsg as character)
+static function getJSONSchemaTst13(/*@*/cErrorMsg as character)
 
     local cURL as character:="http://json-schema.org/draft-04/schema#"
+    local cPath as character,cName as character, cExt as character, cDrive as character
+    local cHB_PS as character:=hb_ps()
+    local cFilePath as character
     local cJSONSchema as character
 
-    __cURLGetTst12(cURL,@cJSONSchema,@cErrorMsg)
+    local lIsDir as logical
+
+    hb_FNameSplit(hb_DirBase(),@cPath,@cName,@cExt,@cDrive)
+
+    cPath+=if(Right(cPath,1)==cHB_PS,"",cHB_PS)
+    cPath+="json-schema"
+    cPath+=cHB_PS
+
+    cName:=hb_FNameName(hb_ProgName())
+    cName+="_schema"
+
+    cExt:=".json"
+
+    cFilePath:=hb_FNameMerge(cPath,cName,cExt)
+
+    hb_FNameSplit(cPath,@cPath)
+
+    lIsDir:=hb_DirExists(cPath)
+    if (!lIsDir)
+        lIsDir:=(hb_DirCreate(cPath)==0)
+    endif
+
+    if (!hb_FileExists(cFilePath))
+        __cURLGetTst13(cURL,@cJSONSchema,@cErrorMsg)
+        cJSONSchema:=hb_StrReplace(cJSONSchema,;
+            {;
+                 "http://json-schema.org/draft-04/schema#" => "json-schema";
+                ,"#/definitions/positiveIntegerDefault0" => "definitions_"+cName+".json#positiveIntegerDefault0";
+                ,"#/definitions/positiveInteger" => "definitions_"+cName+".json#positiveInteger";
+                ,"#/definitions/stringArray" => "definitions_"+cName+".json#stringArray";
+                ,"#/definitions/schemaArray" => "definitions_"+cName+".json#schemaArray";
+                ,"#/definitions/simpleTypes" => "definitions_"+cName+".json#simpleTypes";
+            };
+        )
+        if (lIsDir)
+            hb_MemoWrit(cFilePath,cJSONSchema)
+        endif
+    else
+        cJSONSchema:=hb_MemoRead(cFilePath)
+    endif
 
     return(cJSONSchema)
 
-static function getJSONDataTst12(/*@*/cErrorMsg as character)
+static function getJSONDataTst13(/*@*/cErrorMsg as character)
 
     local cURL as character:="https://standard.open-contracting.org/schema/1__1__5/release-schema.json"
+    local cPath as character,cName as character, cExt as character, cDrive as character
+    local cHB_PS as character:=hb_ps()
+    local cFilePath as character
     local cJSONData as character
 
-    __cURLGetTst12(cURL,@cJSONData,@cErrorMsg)
+    local lIsDir as logical
+
+    hb_FNameSplit(hb_DirBase(),@cPath,@cName,@cExt,@cDrive)
+
+    cPath+=if(Right(cPath,1)==cHB_PS,"",cHB_PS)
+    cPath+="json-data"
+    cPath+=cHB_PS
+
+    cName:=hb_FNameName(hb_ProgName())
+    cName+="_data"
+
+    cExt:=".json"
+
+    cFilePath:=hb_FNameMerge(cPath,cName,cExt)
+
+    lIsDir:=hb_DirExists(cPath)
+    if (!lIsDir)
+        lIsDir:=(hb_DirCreate(cPath)==0)
+    endif
+
+    if (!hb_FileExists(cFilePath))
+        __cURLGetTst13(cURL,@cJSONData,@cErrorMsg)
+        if (lIsDir)
+            hb_MemoWrit(cFilePath,cJSONData)
+        endif
+    else
+        cJSONData:=hb_MemoRead(cFilePath)
+    endif
 
     return(cJSONData)
 
-static function __cURLGetTst12(cURL as character,cResponse as character,/*@*/cErrorMsg)
+static function __cURLGetTst13(cURL as character,cResponse as character,/*@*/cErrorMsg)
 
     local aHeader as array
 

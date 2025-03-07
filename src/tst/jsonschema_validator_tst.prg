@@ -65,6 +65,7 @@ static procedure Execute()
     aAdd(aFunTst,{@getTst10(),"getTst10",.T.})
     aAdd(aFunTst,{@getTst11(),"getTst11",.T.})
     aAdd(aFunTst,{@getTst12(),"getTst12",.T.})
+    aAdd(aFunTst,{@getTst13(),"getTst13",.T.})
 
     aColors:=getColors(Len(aFunTst))
 
@@ -87,7 +88,12 @@ static procedure Execute()
             SetColor("r+/n")
             QOut("Result: Invalid JSON Schema. Errors found:")
             SetColor("")
-            aEval(oJSONSchemaValidator:GetErros(),{|x| QOut("  "+x)})
+                aEval(oJSONSchemaValidator:GetErros(),;
+                    {|x as character|
+                        QOut("  "+x)
+                        return(nil)
+                    };
+                )
         endif
 
         QOut(Replicate("=",80))
@@ -112,7 +118,12 @@ static procedure Execute()
                 SetColor("r+/n")
                 QOut("Result: Invalid JSON. Errors found:")
                 SetColor("")
-                aEval(oJSONSchemaValidator:GetErros(),{|x| QOut("  "+x)})
+                aEval(oJSONSchemaValidator:GetErros(),;
+                    {|x as character|
+                        QOut("  "+x)
+                        return(nil)
+                    };
+                )
             endif
 
             oJSONSchemaValidator:Reset()
@@ -137,19 +148,26 @@ static procedure Execute()
 
     QOut(Replicate("=",80))
 
-    for i:=1 to Len(aFunTst)
-        // Verify expected outcome
-        lValid:=aFunTst[i][3]
-        if (lValid)
-            SetColor("g+/n")
-            QOut("("+aFunTst[i][2]+"): passed")
-            SetColor("")
-        else
-            SetColor("r+/n")
-            QOut("("+aFunTst[i][2]+"): failed")
-            SetColor("")
-        endif
-    next i
+    Eval(;
+        {|aFunTst as array|
+            local lValid as logical
+            local i as numeric
+            for i:=1 to Len(aFunTst)
+                // Verify expected outcome
+                lValid:=aFunTst[i][3]
+                if (lValid)
+                    SetColor("g+/n")
+                    QOut("("+aFunTst[i][2]+"): passed")
+                    SetColor("")
+                else
+                    SetColor("r+/n")
+                    QOut("("+aFunTst[i][2]+"): failed")
+                    SetColor("")
+                endif
+            next i
+            return(nil)
+        };
+    ,aFunTst)
 
     return
 
@@ -195,3 +213,4 @@ static function DateDiffYear(dDate1 as date, dDate2 as date)
 #include "./jsonschema_validator_tst_10.prg"
 #include "./jsonschema_validator_tst_11.prg"
 #include "./jsonschema_validator_tst_12.prg"
+#include "./jsonschema_validator_tst_13.prg"
