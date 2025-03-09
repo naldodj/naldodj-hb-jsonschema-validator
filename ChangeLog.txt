@@ -3,6 +3,13 @@
    Entries may not always be in chronological/commit order.
    See license at the end of file. */
 
+2025-03-09 17:09 UTC naldodj (TODO List: $ref)
+  * src/core/jsonschema_validator.prg
+  * src/tst/hbmk.hbm
+  * src/tst/jsonschema_validator_tst.exe
+  * src/tst/jsonschema_validator_tst.prg
+  * src/tst/jsonschema_validator_tst_13.prg
+
 2025-03-07 15:06 UTC naldodj (TODO List: $ref)
   * .gitignore
   + src/tst/jsonschema_validator_tst_13.prg

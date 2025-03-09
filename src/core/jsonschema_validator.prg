@@ -86,9 +86,9 @@ method New(cSchema as character) class JSONSchemaValidator
 
 method procedure AddError(cError) class JSONSchemaValidator
     if (!self:lOnlyCheck)
-        aAdd(self:aErrors,cError)
+        aAdd(self:aErrors,ProcName(1)+"("+hb_NToC(ProcLine(1))+") : "+cError)
     else
-        aAdd(self:aOnlyCheck,cError)
+        aAdd(self:aOnlyCheck,ProcName(1)+"("+hb_NToC(ProcLine(1))+") : "+cError)
     endif
     return
 
@@ -965,6 +965,8 @@ method ResolveInternalRef(cRef as character,cNode as character) class JSONSchema
 
     local hRefSchema as hash
 
+    local oError as object
+
     if (hb_HHasKey(self:hRefSchema,cRef))
         hRefSchema:=self:hRefSchema[cRef]
     else
@@ -981,7 +983,7 @@ method ResolveInternalRef(cRef as character,cNode as character) class JSONSchema
                 cFullKey+=hb_JSONEncode(cKey)
                 cFullKey+="]"
             next each
-            begin sequence
+            begin sequence with ErrorBlock({|oError| Break(oError) } )
                 if (!Empty(cFullKey))
                     private m__hRefSchema as hash
                     M->m__hRefSchema:=hb_HMerge({=>},self:hSchema)
@@ -990,9 +992,9 @@ method ResolveInternalRef(cRef as character,cNode as character) class JSONSchema
                 else
                     hRefSchema:=hb_HMerge({=>},self:hSchema)
                 endif
-            recover
+            recover using oError
                 hRefSchema:={=>}
-                self:AddError("Invalid JSON $Ref Schema provided at "+cNode+". $Ref:"+cRef)
+                self:AddError("Invalid JSON $Ref Schema provided at "+cNode+". $Ref:"+cRef+if(hb_IsString(oError:description),". "+oError:description,""))
             end sequence
         endif
         self:hRefSchema[cRef]:=hRefSchema
@@ -1002,6 +1004,7 @@ method ResolveInternalRef(cRef as character,cNode as character) class JSONSchema
 
 method ResolveExternalRef(cRef as character,cNode as character) class JSONSchemaValidator
 
+    local cRefTmp as character:=cRef
     local cBaseURL as character
     local cErrorMsg as character
     local cJSONSchema as character
@@ -1012,14 +1015,14 @@ method ResolveExternalRef(cRef as character,cNode as character) class JSONSchema
 
     begin sequence
 
-        cBaseURL:=self:ResolveBaseURL(self:hSchema,cRef)
+        cBaseURL:=self:ResolveBaseURL(self:hSchema,@cRefTmp)
 
         if (hb_HHasKey(self:hRefSchema,cBaseURL))
             hRefSchema:=self:hRefSchema[cBaseURL]
             break
         endif
 
-        oTURL:=TUrl():New(cBaseURL)
+        oTURL:=TUrl():New(if(!"http"$cBaseURL,StrTran("file://"+cBaseURL,"///","//"),cBaseURL))
 
         switch Lower(oTURL:cProto)
             case "http"
@@ -1042,6 +1045,12 @@ method ResolveExternalRef(cRef as character,cNode as character) class JSONSchema
             break
         endif
 
+        self:hSchema:=hb_HMerge(self:hSchema,hRefSchema)
+
+        if (Left(cRefTmp,1)=="#")
+            hRefSchema:=self:ResolveInternalRef(cRefTmp,cNode)
+        endif
+
         self:hRefSchema[cBaseURL]:=hRefSchema
 
     end sequence
@@ -1050,24 +1059,36 @@ method ResolveExternalRef(cRef as character,cNode as character) class JSONSchema
 
 method ResolveBaseURL(hSchema as character,cRef as character) class JSONSchemaValidator
 
-    local cFPath as character,cFName as character,cFExt as character,cFDrive as character
+    //local cFPath as character,cFName as character,cFExt as character,cFDrive as character
     local cBaseURL as character
     local cFilePath as character
 
+    local nATRef as numeric
+
     if (hb_HHasKey(hSchema,"$id"))
         cBaseURL:=hSchema["$id"]
-        cBaseURL+=cRef
     else
         cBaseURL:=cRef
     endif
 
     if (Left(cBaseURL,4)!="http")
         if (!Left(Lower(cBaseURL),4)$"file")
-            hb_FNameSplit(hb_DirBase(),@cFPath,@cFName,@cFExt,@cFDrive)
-            cFName:=cBaseURL
-            cFilePath:=hb_FNameMerge(cFPath,cFName,cFExt)
-            cBaseURL:="file://"+cFilePath
-            cBaseURL:=strTran(cBaseURL,"file:///","file://")
+            nATRef:=RAT("#",cBaseURL)
+            if (nATRef>0)
+                cBaseURL:=SubStr(cBaseURL,1,nATRef-1)
+                nATRef:=RAT("#",cBaseURL)
+                cRef:=SubStr(cRef,nATRef)
+            endif
+            cBaseURL:=hb_PathRelativize(".",hb_DirSepAdd(cBaseURL),.T.)
+            nATRef:=RAT("#",cRef)
+            if (nATRef>0)
+                cFilePath:=SubStr(cRef,1,nATRef-1)
+                nATRef:=RAT("#",cRef)
+                cRef:=SubStr(cRef,nATRef)
+            else
+                cFilePath:=cRef
+            endif
+            cBaseURL:=hb_FNameMerge(cBaseURL,cFilePath)
         endif
     endif
 

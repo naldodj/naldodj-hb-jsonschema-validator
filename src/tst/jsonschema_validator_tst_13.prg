@@ -43,6 +43,8 @@ static function getJSONSchemaTst13(/*@*/cErrorMsg as character)
     local cFilePath as character
     local cJSONSchema as character
 
+    local hJSONSchema as hash
+
     local lIsDir as logical
 
     hb_FNameSplit(hb_DirBase(),@cPath,@cName,@cExt,@cDrive)
@@ -51,7 +53,7 @@ static function getJSONSchemaTst13(/*@*/cErrorMsg as character)
     cPath+="json-schema"
     cPath+=cHB_PS
 
-    cName:=hb_FNameName(hb_ProgName())
+    cName:=hb_FNameName(hb_ProgName()+"_"+Lower(ProcName()))
     cName+="_schema"
 
     cExt:=".json"
@@ -67,17 +69,24 @@ static function getJSONSchemaTst13(/*@*/cErrorMsg as character)
 
     if (!hb_FileExists(cFilePath))
         __cURLGetTst13(cURL,@cJSONSchema,@cErrorMsg)
-        cJSONSchema:=hb_StrReplace(cJSONSchema,;
-            {;
-                 "http://json-schema.org/draft-04/schema#" => "json-schema";
-                ,"#/definitions/positiveIntegerDefault0" => "definitions_"+cName+".json#positiveIntegerDefault0";
-                ,"#/definitions/positiveInteger" => "definitions_"+cName+".json#positiveInteger";
-                ,"#/definitions/stringArray" => "definitions_"+cName+".json#stringArray";
-                ,"#/definitions/schemaArray" => "definitions_"+cName+".json#schemaArray";
-                ,"#/definitions/simpleTypes" => "definitions_"+cName+".json#simpleTypes";
-            };
-        )
         if (lIsDir)
+            hb_JSONDecode(cJSONSchema,@hJSONSchema)
+            if (hb_HHasKey(hJSONSchema,"definitions"))
+                hb_MemoWrit(strTran(cFilePath,cName,cName+"_definitions"),hb_JSONEncode({"definitions" => hJSONSchema["definitions"]},.T.))
+                hb_HDel(hJSONSchema,"definitions")
+                cJSONSchema:=hb_JSONEncode(hJSONSchema,.T.)
+            endif
+            cJSONSchema:=hb_StrReplace(cJSONSchema,;
+                {;
+                     "http://json-schema.org/draft-04/schema#" => "json-schema";
+                    ,"#/definitions/positiveIntegerDefault0" => cName+"_definitions.json#/definitions/positiveIntegerDefault0";
+                    ,"#/definitions/positiveInteger" => cName+"_definitions.json#/definitions/positiveInteger";
+                    ,"#/definitions/stringArray" => cName+"_definitions.json#/definitions/stringArray";
+                    ,"#/definitions/schemaArray" => cName+"_definitions.json#/definitions/schemaArray";
+                    ,"#/definitions/simpleTypes" => cName+"_definitions.json#/definitions/simpleTypes";
+                };
+            )
+            cJSONSchema:=cJSONSchema:=hb_StrReplace(cJSONSchema,{'"id": "json-schema"' => '"$id": "json-schema"'})
             hb_MemoWrit(cFilePath,cJSONSchema)
         endif
     else
@@ -102,7 +111,7 @@ static function getJSONDataTst13(/*@*/cErrorMsg as character)
     cPath+="json-data"
     cPath+=cHB_PS
 
-    cName:=hb_FNameName(hb_ProgName())
+    cName:=hb_FNameName(hb_ProgName()+"_"+ProcName())
     cName+="_data"
 
     cExt:=".json"

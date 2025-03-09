@@ -148,8 +148,7 @@ static procedure Execute()
 
     QOut(Replicate("=",80))
 
-    Eval(;
-        {|aFunTst as array|
+    {|aFunTst as array|
             local lValid as logical
             local i as numeric
             for i:=1 to Len(aFunTst)
@@ -166,8 +165,7 @@ static procedure Execute()
                 endif
             next i
             return(nil)
-        };
-    ,aFunTst)
+    }:Eval(aFunTst)
 
     return
 
