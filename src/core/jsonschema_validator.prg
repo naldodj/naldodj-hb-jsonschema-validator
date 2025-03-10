@@ -1059,7 +1059,6 @@ method ResolveExternalRef(cRef as character,cNode as character) class JSONSchema
 
 method ResolveBaseURL(hSchema as character,cRef as character) class JSONSchemaValidator
 
-    //local cFPath as character,cFName as character,cFExt as character,cFDrive as character
     local cBaseURL as character
     local cFilePath as character
 
@@ -1144,10 +1143,8 @@ static function __cURLGet(cURL as character,cJSONSchema as character,/*@*/cError
 
                 aHeader:=Array(0)
                 aAdd(aHeader,"Content-Type: application/json;charset=utf-8")
-                /*TODO
                 aAdd(aHeader,"Accept-Encoding: gzip,deflate")
                 aAdd(aHeader,"Content-Encoding: gzip")
-                */
 
                 curl_easy_setopt(phcUrl,HB_CURLOPT_HTTPHEADER,aHeader)
                 curl_easy_setopt(phcUrl,HB_CURLOPT_URL,cURL)

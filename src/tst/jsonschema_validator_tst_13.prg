@@ -30,7 +30,7 @@ static function getTst13()
 
     // Array of test cases following the schema
     aTests:={;
-         {if(lExpected,"Valid","Invalid")+" Case: Full object schema with required and optional properties.",cData,lExpected};
+         {if(lExpected,"Valid","Invalid")+" Case: External Full object schema with required and optional properties.",cData,lExpected};
     }
 
     return(aTests)
