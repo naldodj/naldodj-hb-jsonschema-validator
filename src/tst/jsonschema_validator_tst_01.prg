@@ -12,14 +12,12 @@
     Released to Public Domain.
     --------------------------------------------------------------------------------------
 */
-static function getTst01()
+static function getTst01(cSchema as character)
 
     local aTests as array
 
-    cFunName:=ProcName()
-
     // JSON Schema example
-    #pragma __cstream|M->cSchema:=%s
+    #pragma __cstream|cSchema:=%s
 {
     "type": "object",
     "required": [

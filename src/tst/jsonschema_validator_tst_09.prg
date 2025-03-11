@@ -12,14 +12,12 @@
     Released to Public Domain.
     --------------------------------------------------------------------------------------
 */
-static function getTst09()
+static function getTst09(cSchema as character)
 
     local aTests as array
 
-    cFunName:=ProcName()
-
     // JSON Schema array example with "$ref"
-    #pragma __cstream|M->cSchema:=%s
+    #pragma __cstream|cSchema:=%s
 {
     "type": "array",
     "items": { "$ref": "#/$defs/positiveInteger" },

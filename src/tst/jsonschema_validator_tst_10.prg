@@ -12,14 +12,12 @@
     Released to Public Domain.
     --------------------------------------------------------------------------------------
 */
-static function getTst10()
+static function getTst10(cSchema as character)
 
     local aTests as array
 
-    cFunName:=ProcName()
-
     // JSON Schema array example with "$ref"
-    #pragma __cstream|M->cSchema:=%s
+    #pragma __cstream|cSchema:=%s
 {
   "$id": "https://example.com/polygon",
   "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -15,8 +15,6 @@
 
 REQUEST HB_CODEPAGE_UTF8EX
 
-memvar cSchema,cFunName
-
 procedure Main()
 
     CLS
@@ -40,6 +38,8 @@ static procedure Execute()
     local aFunTst as array
 
     local cJSON as character
+    local cSchema as character
+    local cFunName as character
 
     local lValid as logical
 
@@ -48,9 +48,6 @@ static procedure Execute()
     local nTestCount as numeric:=0
 
     local oJSONSchemaValidator as object
-
-    private cSchema as character
-    private cFunName as character
 
     aFunTst:=Array(0)
     aAdd(aFunTst,{@getTst01(),"getTst01",.T.})
@@ -74,7 +71,8 @@ static procedure Execute()
 
     for i:=1 to Len(aFunTst)
 
-        aTests:=hb_execFromArray(aFunTst[i][1])
+        aTests:=aFunTst[i][1]:Eval(@cSchema)
+        cFunName:=aFunTst[i][2]
 
         oJSONSchemaValidator:SetSchema(cSchema)
 

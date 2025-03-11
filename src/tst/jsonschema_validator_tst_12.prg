@@ -12,7 +12,7 @@
     Released to Public Domain.
     --------------------------------------------------------------------------------------
 */
-static function getTst12()
+static function getTst12(cSchema as character)
 
     local aTests as array
 
@@ -20,9 +20,7 @@ static function getTst12()
 
     local lExpected as logical
 
-    cFunName:=ProcName()
-
-    M->cSchema:=getJSONSchemaTst12()
+    cSchema:=getJSONSchemaTst12()
 
     cData:=getJSONDataTst12()
 
