@@ -19,20 +19,30 @@ static function getTst14(cSchema as character)
     // JSON Schema array example with "patternProperties"
     #pragma __cstream|cSchema:=%s
 {
-  "type": "object",
-  "patternProperties": {
-    "^S_": { "type": "string" },
-    "^I_": { "type": "integer" }
-  }
+    "type": "object",
+    "patternProperties": {
+        "^S_": {
+            "type": "string"
+        },
+        "^I_": {
+            "type": "integer"
+        },
+        "^[Nn]ame$": {
+            "type": "string"
+        },
+        "^[Aa]ge$": {
+            "type": "number"
+        }
+    }
 }
     #pragma __endtext
 
     // Array of test cases: "patternProperties"
     aTests:={;
-        {"Valid case: If the name starts with S_, it must be a string",'{"S_25": "This is a string"}',.T.};
-       ,{"Valid case: If the name starts with I_, it must be a number",'{"I_0": 42}',.T.};
-       ,{"Invalid case: If the name starts with S_, it must be a string",'{"S_0": 42 }',.F.};
-       ,{"Invalid case: If the name starts with I_, it must be an integer",'{ "I_42": "This is a string" }',.F.};
+        {"Valid case: If the name starts with S_, it must be a string",'{"S_25": "This is a string","name": "John Doe", "age": 21}',.T.};
+       ,{"Valid case: If the name starts with I_, it must be a number",'{"I_0": 42,"name": "John Doe", "age": 21}',.T.};
+       ,{"Invalid case: If the name starts with S_, it must be a string",'{"S_0": 42,"name": 21, "age": "John Doe"}',.F.};
+       ,{"Invalid case: If the name starts with I_, it must be an integer",'{ "I_42": "This is a string","name": 21, "age": "John Doe" }',.F.};
        ,{"Invalid case: This is a key that doesn't match any of the regular expressions",'{ "keyword": "value" }',.T.};
     }
 
