@@ -1,285 +1,157 @@
-# JSONValidator Documentation
+# JSONSchemaValidator
 
-The `JSONValidator` class is a Harbour-based implementation of a JSON schema validator. It is designed to decode a JSON schema, validate JSON data against it, and report errors for mismatches in data type, structure, and constraints. The validator supports a range of schema features including type checking, enumeration, pattern matching, minimum/maximum validations, and unique item checks for arrays.
-
-## Overview
-
-The JSON validator provides the following functionalities:
-- **Schema Setup:** Accepts a JSON schema (as a string) and decodes it into an internal hash structure.
-- **Data Validation:** Validates JSON data against the schema, handling different JSON data types (object, array, string, number, boolean, and null).
-- **Error Handling:** Collects error messages during validation. In fast mode (`lFastMode`), it stops at the first error encountered; otherwise, it continues to accumulate all errors.
-- **Type & Constraint Checking:** Validates values according to schema properties such as type, required properties, enumerations, numeric constraints (minimum, maximum, exclusive limits, and multipleOf), string constraints (minLength, maxLength, pattern), and array-specific constraints (minItems, maxItems, uniqueItems, and contains).
-
-## Class Data Members
-
-- **aErrors (Array):** Stores error messages generated during the validation process.
-- **aOnlyCheck (Array):** Temporary array for holding errors when performing sub-checks (e.g., for array `contains` checks).
-- **cSchema (Character):** The original JSON schema provided as a string.
-- **hSchema (Hash):** The decoded JSON schema stored as a Harbour hash.
-- **hJSONData (Hash):** The decoded JSON data being validated.
-- **lFastMode (Logical):** When set to `.T.` (true), the validator stops at the first error encountered.
-- **lHasError (Logical):** Indicates if any errors were found during validation.
-- **lOnlyCheck (Logical):** Used internally to control error collection when only checking a part of the schema.
-
-## Constructor
-
-### `New(cSchema as character)`
-
-Creates a new instance of the `JSONValidator` and initializes it with the provided JSON schema.
-
-- **Parameters:**  
-  - `cSchema`: A string containing the JSON schema.
-- **Returns:**  
-  - The instance of `JSONValidator`.
-
-**Usage Example:**
-```harbour
-oJSONValidator := JSONValidator():New(cSchema)
-```
-
-## Methods
-
-### `AddError(cError)`
-
-Adds an error message to the error collection.
-
-- **Parameters:**  
-  - `cError`: The error message (string) to add.
-- **Notes:**  
-  - If `lOnlyCheck` is active, the error is added to `aOnlyCheck`; otherwise, it is added to `aErrors`.
+The **JSONSchemaValidator** class is responsible for validating JSON data based on a defined _JSON Schema_. It implements various methods to check types, patterns, numerical constraints, required properties, and schema references (both internal and external). The class utilizes internal functions for JSON manipulation (such as `hb_JSONEncode` and `hb_JSONDecode`), regular expression handling, and making HTTP/file requests when needed.
 
 ---
 
-### `SetSchema(cSchema as character) as logical`
+## Main Attributes
 
-Sets the JSON schema for the validator. This method decodes the schema and stores it in the internal hash (`hSchema`).
-
-- **Parameters:**  
-  - `cSchema`: A string with the JSON schema.
-- **Returns:**  
-  - A logical value indicating whether the schema was successfully set.
-- **Notes:**  
-  - In case of an error during decoding, an error message is added.
-
----
-
-### `Reset(cSchema as character) as logical`
-
-Resets the validator with a new JSON schema by calling `SetSchema`.
-
-- **Parameters:**  
-  - `cSchema`: A new JSON schema string.
-- **Returns:**  
-  - A logical value indicating whether the reset was successful.
+- **aErrors**: Array that stores error messages generated during validation.
+- **aOnlyCheck**: Array used to store error messages in validation runs that are only checking (without accumulating errors).
+- **cSchema**: String containing the JSON Schema in text format.
+- **hSchema**: Hash representing the decoded JSON Schema.
+- **hRefSchema**: Hash for caching resolved references (both internal and external).
+- **hRegexMatch**: Hash used to store compiled regular expressions.
+- **lFastMode**: Logical value that, when enabled, stops validation upon finding the first error.
+- **lHasError**: Flag indicating whether any validation errors occurred.
+- **lOnlyCheck**: Flag to indicate whether validation is running in check-only mode.
+- **xJSONData**: Stores the JSON data (already decoded) that will be validated.
 
 ---
 
-### `Validate(cJSONData as character) as logical`
+## Constructor and Configuration Methods
 
-Validates the provided JSON data string against the stored schema.
+### New(cSchema as character)
+- **Description**: Constructor that creates a new instance of the validator and sets the schema to be used.
+- **Parameters**:
+  - `cSchema`: String containing the JSON Schema.
+- **Return**: An instance of the class configured with the provided schema.
 
-- **Parameters:**  
-  - `cJSONData`: A JSON data string.
-- **Returns:**  
-  - A logical value (`.T.` if valid, `.F.` if errors were found).
-- **Process:**  
-  1. Decodes the JSON data.
-  2. Calls `ValidateObject` to recursively validate the data.
-  3. Sets `lHasError` based on whether errors were accumulated.
-  
-**Usage Example:**
-```harbour
-lValid := oJSONValidator:Validate(cJSONData)
-```
+### Reset(cSchema as character) as logical
+- **Description**: Resets the validator, setting a new schema.
+- **Parameters**:
+  - `cSchema`: New JSON Schema (in string format).
+- **Return**: Boolean indicating whether the new schema was successfully configured.
 
----
+### SetSchema(cSchema as character) as logical
+- **Description**: Sets (or updates) the JSON Schema to be used for validation.
+- **Parameters**:
+  - `cSchema`: String containing the new JSON Schema.
+- **Return**: Boolean indicating whether the schema was successfully set.
 
-### `ValidateObject(xData as anytype, hSchema as hash, cPath as character) as logical`
-
-Recursively validates an object or value against the corresponding part of the JSON schema.
-
-- **Parameters:**  
-  - `xData`: The data to validate (can be any type).
-  - `hSchema`: The portion of the schema (as a hash) relevant for `xData`.
-  - `cPath`: A string representing the current path in the JSON structure (useful for error messages).
-- **Returns:**  
-  - A logical value indicating if the object is valid.
-- **Notes:**  
-  - Performs type checking, required property validation, and property-specific validations based on schema definitions.
+### SetFastMode(lFastMode as logical) as logical
+- **Description**: Configures fast validation mode. In _fast mode_, validation stops as soon as an error is encountered.
+- **Parameters**:
+  - `lFastMode`: Logical value (true or false).
+- **Return**: Previous mode value (before the change).
 
 ---
 
-### `CheckType(xValue as anytype, xType as anytype, cPath as character) as logical`
+## Validation Methods
 
-Checks whether `xValue` matches the expected type (`xType`).
+### Validate(cJSONData as character) as logical
+- **Description**: Runs validation on JSON data (provided as a string) against the configured schema.
+- **Parameters**:
+  - `cJSONData`: String containing the JSON data to be validated.
+- **Return**: Boolean indicating whether validation completed without errors.
 
-- **Parameters:**  
-  - `xValue`: The value to check.
-  - `xType`: The expected type. This can be a string (e.g., `"string"`, `"number"`) or an array of possible types.
-  - `cPath`: The current path in the JSON structure.
-- **Returns:**  
-  - `.T.` if the type matches; otherwise, `.F.`.
-- **Notes:**  
-  - Adds an error message if there is a type mismatch.
-  - Uses the helper static function `__HB2JSON` to convert Harbour type codes into JSON type names.
+### ValidateObject(xData as anytype, hSchema as hash, cNode as character) as logical
+- **Description**: Core method that validates a JSON object (or value) against a specific schema.
+- **Parameters**:
+  - `xData`: Data (any type) representing the JSON object or value.
+  - `hSchema`: Hash containing the schema rules to be applied.
+  - `cNode`: String indicating the current path/node in the JSON structure (used for error tracking).
+- **Return**: Boolean indicating whether the object conforms to the schema.
 
----
-
-### `CheckEnum(xValue as anytype, aEnum as array, cPath as character) as logical`
-
-Validates that the given value is one of the allowed enumerated values.
-
-- **Parameters:**  
-  - `xValue`: The value to validate.
-  - `aEnum`: An array of allowed values.
-  - `cPath`: The current path in the JSON structure.
-- **Returns:**  
-  - `.T.` if `xValue` is allowed; otherwise, `.F.`.
-- **Notes:**  
-  - An error message is added if the validation fails.
+### GetErrors() / HasError()
+- **Description**:
+  - **GetErrors()**: Returns the array of errors accumulated during validation.
+  - **HasError()**: Returns a logical value indicating whether any validation errors occurred.
+- **Return**: Array of errors or boolean, respectively.
 
 ---
 
-### `CheckNumber(nValue as numeric, hSchema as hash, cPath as character) as logical`
+## Specific Check Methods
 
-Checks a numeric value against the schema constraints for numbers, including:
-- Type check for `"number"` or `"integer"`.
-- Multiple-of constraints.
-- Minimum, maximum, exclusiveMinimum, and exclusiveMaximum limits.
+### AddError(cNode as character, cError as character)
+- **Description**: Adds an error message associated with a specific node in the JSON structure.
+- **Parameters**:
+  - `cNode`: Identifier of the node where the error occurred.
+  - `cError`: Descriptive error message.
 
-- **Parameters:**  
-  - `nValue`: The numeric value to check.
-  - `hSchema`: The schema hash that may contain numeric constraints.
-  - `cPath`: The current path in the JSON structure.
-- **Returns:**  
-  - `.T.` if the number is valid; otherwise, `.F.`.
-- **Notes:**  
-  - Handles floating-point tolerance when checking `multipleOf`.
+### CheckType(xValue as anytype, xType as anytype, cNode as character) as logical
+- **Description**: Checks whether the type of `xValue` matches the expected type defined in `xType`. Supports both a single string and an array of strings.
+- **Parameters**:
+  - `xValue`: Value to be checked.
+  - `xType`: Expected type or array of expected types.
+  - `cNode`: Current path/node for error tracking.
+- **Return**: Boolean indicating whether the type is correct.
 
----
+### CheckEnum(xValue as anytype, aEnum as array, cNode as character) as logical
+- **Description**: Checks whether the given value (`xValue`) matches any of the values defined in the enumeration list (`aEnum`).
+- **Parameters**:
+  - `xValue`: Value to be validated.
+  - `aEnum`: Array containing the allowed values.
+  - `cNode`: Reference node for error tracking.
+- **Return**: Boolean indicating whether the value is valid.
 
-### `CheckString(cValue as character, hSchema as hash, cPath as character) as logical`
-
-Validates a string value against the schema. Checks include:
-- Minimum and maximum length.
-- Pattern matching via a regular expression.
-
-- **Parameters:**  
-  - `cValue`: The string value.
-  - `hSchema`: The schema hash that may include string constraints.
-  - `cPath`: The current path in the JSON structure.
-- **Returns:**  
-  - `.T.` if the string is valid; otherwise, `.F.`.
-
----
-
-### `CheckPattern(cValue as character, cPattern as character, cPath as character) as logical`
-
-Uses regular expression matching to verify if `cValue` conforms to `cPattern`.
-
-- **Parameters:**  
-  - `cValue`: The string value.
-  - `cPattern`: The regex pattern.
-  - `cPath`: The current path in the JSON structure.
-- **Returns:**  
-  - `.T.` if the string matches the pattern; otherwise, `.F.`.
-- **Notes:**  
-  - Invokes the static helper `__regexMatch` for pattern matching.
+### CheckFormat(cValue as character, cFormat as character, cNode as character) as logical
+- **Description**: Validates a string value according to predefined formats (e.g., _date-time_, _date_, _time_, _duration_, _email_, _hostname_, etc.).
+- **Parameters**:
+  - `cValue`: String value to be validated.
+  - `cFormat`: Expected format (string).
+  - `cNode`: Node where validation is occurring.
+- **Return**: Boolean indicating whether the value meets the specified format.
 
 ---
 
-### `CheckRequired(hData as hash, aRequired as array, cPath as character) as logical`
+## Reference Resolution Methods ($ref)
 
-Ensures that the required properties (specified in `aRequired`) exist in the given object.
+To handle internal and external references in the schema (_JSON Reference_), the class implements the following methods:
 
-- **Parameters:**  
-  - `hData`: The data object (hash) to check.
-  - `aRequired`: An array of property names that are required.
-  - `cPath`: The current path in the JSON structure.
-- **Returns:**  
-  - `.T.` if all required properties are present; otherwise, `.F.`.
-- **Notes:**  
-  - If `hData` is not an object, an error is reported.
+### ResolveRef(cRef as character, cNode as character) as hash
+- **Description**: Determines whether the reference is internal or external (based on the first character) and calls the appropriate resolution method.
+- **Parameters**:
+  - `cRef`: String containing the reference (e.g., "#/definitions/Name" or a URL).
+  - `cNode`: Current node for error tracking.
+- **Return**: Hash containing the resolved schema.
 
----
+### ResolveInternalRef(cRef as character, cNode as character) as hash
+- **Description**: Resolves internal references present within the JSON Schema itself.
+- **Parameters**:
+  - `cRef`: Internal reference (must start with "#").
+  - `cNode`: Current node.
+- **Return**: Hash of the schema corresponding to the internal reference.
 
-### `CheckArray(aValues as array, hSchema as hash, cPath as character) as logical`
-
-Validates an array against the schema. It performs several checks:
-- Validates each element in the array against the defined schema for items.
-- Supports `uniqueItems` constraint to ensure all items in the array are unique.
-- If a `contains` constraint is present, counts how many array items satisfy the condition and validates them against `minContains` and `maxContains`.
-
-- **Parameters:**  
-  - `aValues`: The array of values.
-  - `hSchema`: The schema hash that defines array constraints.
-  - `cPath`: The current path in the JSON structure.
-- **Returns:**  
-  - `.T.` if the array is valid; otherwise, `.F.`.
-- **Notes:**  
-  - Uses temporary error collections (`aOnlyCheck`) when checking the `contains` condition.
-
----
-
-## Static Helper Functions
-
-### `__HB2JSON(cType as character) as character`
-
-Converts Harbour internal type codes into corresponding JSON type names.
-
-- **Parameters:**  
-  - `cType`: A single-character Harbour type code (e.g., `"C"` for character, `"N"` for number).
-- **Returns:**  
-  - A string with the JSON type name (e.g., `"string"`, `"number"`, `"object"`).
-
----
-
-### `__regexMatch(cString as character, cPattern as character) as logical`
-
-Performs a regex match on `cString` against the provided regular expression pattern.
-
-- **Parameters:**  
-  - `cString`: The string to test.
-  - `cPattern`: The regex pattern.
-- **Returns:**  
-  - `.T.` if a match is found; otherwise, `.F.`.
-- **Notes:**  
-  - Compiles the regex in a case-sensitive manner without multi-line matching.
+### ResolveExternalRef(cRef as character, cNode as character) as hash
+- **Description**: Resolves external references, retrieving the schema via HTTP or file system based on the given URL or path.
+- **Parameters**:
+  - `cRef`: External reference (does not start with "#").
+  - `cNode`: Node for error tracking and messages.
+- **Return**: Hash containing the resolved external schema.
 
 ---
 
 ## Usage Example
 
-Below is a sample snippet showing how to instantiate and use the JSON validator:
-
 ```harbour
-// Create a new JSONValidator with the provided schema
-local oJSONValidator := JSONValidator():New(cSchema)
+// Create an instance with the JSON Schema
+LOCAL oValidator := JSONSchemaValidator():New( cMyJSONSchema )
 
-// Validate some JSON data
-local lValid := oJSONValidator:Validate(cJSONData)
+// Optional: enable fast validation mode
+oValidator:SetFastMode( .T. )
 
-if (lValid)
-    QOut("JSON data is valid!")
-else
-    QOut("JSON data is invalid. Errors:")
-    for each error in oJSONValidator:aErrors
-        QOut("  " + error)
-    next
-endif
+// Validate JSON data
+IF oValidator:Validate( cMyJSONData )
+   ? "Validation successful!"
+ELSE
+   ? "Errors found:"
+   FOR EACH cError IN oValidator:GetErrors()
+      ? cError
+   NEXT
+ENDIF
 ```
 
-## Error Handling and Fast Mode
-
-- **Fast Mode (`lFastMode`):** When enabled, the validator exits on the first error encountered.
-- **Error Collection:** All error messages are stored in `aErrors`. When performing sub-checks (such as for `contains` in arrays), temporary errors may be stored in `aOnlyCheck`.
-
 ---
 
-## Conclusion
-
-The `JSONValidator` class is a comprehensive tool for validating JSON data against a defined schema. It provides detailed feedback for any discrepancies between the JSON data and the schema, making it easier to identify and correct issues in JSON documents.
-
-This documentation provides an overview of the class structure, method functionalities, and usage patterns. Adjust or extend the documentation as needed to match your project's requirements.
-
----
+This documentation provides a detailed overview of the **JSONSchemaValidator** class and can serve as a reference for developers looking to integrate or extend JSON validation functionality based on schemas.
