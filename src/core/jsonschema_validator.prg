@@ -824,6 +824,8 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
     local cType as character
     local cProperty as character
     local cNodeProperty as character
+    local cNodePropertyOff as character
+    local cNodePropertyOffItem as character
 
     local hProperties as hash
 
@@ -833,6 +835,8 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
 
     local lValid as logical
     local lHasRef as logical
+
+    local nOff as numeric
 
     local xType as anytype
 
@@ -923,6 +927,18 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
             endif
         endif
 
+        if ((hb_HHasKey(hSchema,"allOf")).and.(valType(hSchema["allOf"])=="A"))
+            cNodePropertyOff:=(cNode+"."+"allOf")
+            for nOff:=1 to Len(hSchema["allOf"])
+                cNodePropertyOffItem:=(cNodePropertyOff+".item("+hb_NToC(nOff)+")")
+                if (!self:ValidateObject(xData,hSchema["allOf"][nOff],cNodePropertyOffItem))
+                    if (self:lFastMode)
+                        break
+                    endif
+                endif
+            next nOff
+        endif
+
         if (!hb_HHasKey(hSchema,"properties"))
             break
         endif
@@ -995,6 +1011,17 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
                                 endif
                                 exit
                             case "object"
+                                if ((hb_HHasKey(hPropertySchema,"allOf")).and.(valType(hPropertySchema["allOf"])=="A"))
+                                    cNodePropertyOff:=(cNodeProperty+"."+"allOf")
+                                    for nOff:=1 to Len(hPropertySchema["allOf"])
+                                        cNodePropertyOffItem:=(cNodePropertyOff+".item("+hb_NToC(nOff)+")")
+                                        if (!self:ValidateObject(xData[cProperty],hPropertySchema["allOf"][nOff],cNodePropertyOffItem))
+                                            if (self:lFastMode)
+                                                break
+                                            endif
+                                        endif
+                                    next nOff
+                                endif
                                 if (!self:ValidateObject(xData[cProperty],hPropertySchema,cNodeProperty))
                                     if (self:lFastMode)
                                         break

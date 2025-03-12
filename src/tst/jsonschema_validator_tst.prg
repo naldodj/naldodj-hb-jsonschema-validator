@@ -67,6 +67,7 @@ static procedure Execute()
     aAdd(aFunTst,{@getTst15(),"getTst15",.T.})
     aAdd(aFunTst,{@getTst16(),"getTst16",.T.})
     aAdd(aFunTst,{@getTst17(),"getTst17",.T.})
+    aAdd(aFunTst,{@getTst18(),"getTst18",.T.})
 
     aColors:=getColors(Len(aFunTst))
 
@@ -218,3 +219,4 @@ static function DateDiffYear(dDate1 as date, dDate2 as date)
 #include "./jsonschema_validator_tst_15.prg"
 #include "./jsonschema_validator_tst_16.prg"
 #include "./jsonschema_validator_tst_17.prg"
+#include "./jsonschema_validator_tst_18.prg"
