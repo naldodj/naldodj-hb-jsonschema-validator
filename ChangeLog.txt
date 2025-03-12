@@ -3,6 +3,13 @@
    Entries may not always be in chronological/commit order.
    See license at the end of file. */
 
+2025-03-12 08:58 UTC naldodj (TODO List: patternProperties & additionalProperties)
+  + src/tst/jsonschema_validator_tst_15.prg
+  * src/tst/jsonschema_validator_tst_14.prg
+  * src/tst/jsonschema_validator_tst.exe
+  * src/tst/jsonschema_validator_tst.prg
+  * src/core/jsonschema_validator.prg
+
 2025-03-12 08:09 UTC naldodj (TODO List: patternProperties)
   * src/tst/jsonschema_validator_tst_14.prg
   * src/tst/jsonschema_validator_tst.exe

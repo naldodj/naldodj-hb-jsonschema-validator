@@ -12,7 +12,7 @@
     Released to Public Domain.
     --------------------------------------------------------------------------------------
 */
-static function getTst14(cSchema as character)
+static function getTst15(cSchema as character)
 
     local aTests as array
 
@@ -34,7 +34,7 @@ static function getTst14(cSchema as character)
             "type": "number"
         }
     },
-    "additionalProperties": true
+    "additionalProperties": false
 }
     #pragma __endtext
 
@@ -44,7 +44,7 @@ static function getTst14(cSchema as character)
        ,{"Valid case: If the name starts with I_, it must be a number",'{"I_0": 42,"name": "John Doe", "age": 21}',.T.};
        ,{"Invalid case: If the name starts with S_, it must be a string",'{"S_0": 42,"name": 21, "age": "John Doe"}',.F.};
        ,{"Invalid case: If the name starts with I_, it must be an integer",'{ "I_42": "This is a string","name": 21, "age": "John Doe" }',.F.};
-       ,{"Valid case: This is a key that doesn't match any of the regular expressions but allowed with additionalProperties",'{ "keyword": "value" }',.T.};
+       ,{"Invalid case: This is a key that doesn't match any of the regular expressions and not allowed with additionalProperties",'{ "keyword": "value" }',.F.};
     }
 
     return(aTests)

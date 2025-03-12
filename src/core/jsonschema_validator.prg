@@ -49,7 +49,7 @@ class JSONSchemaValidator
     method CheckFormat(cValue as character,cFormat as character,cNode as character) as logical
     method CheckNumber(nValue as numeric,hSchema as hash,cNode as character) as logical
     method CheckPattern(cValue as character,cPattern as character,cNode as character) as logical
-    method ChackPatternProperties(hData as hash,hPatternProperties,cNode) as logical
+    method CheckPatternProperties(hData as hash,hSchema as hash,cNode) as logical
     method CheckRequired(hData as hash,aRequired as array,cNode as character) as logical
     method CheckString(cValue as numeric,hSchema as hash,cNode as character) as logical
     method CheckType(xValue as anytype,xType as anytype,cNode as character) as logical
@@ -566,13 +566,27 @@ method CheckPattern(cValue as character,cPattern as character,cNode as character
 
     return(lValid)
 
-method ChackPatternProperties(hData as hash,hPatternProperties,cNode) class JSONSchemaValidator
+method CheckPatternProperties(hData as hash,hSchema as hash,cNode) class JSONSchemaValidator
 
     local cPattern as character
     local cProperty as character
     local cNodeProperty as character
 
+    local hMatch as hash:={ => }
+    local hPatternProperties as hash:=hSchema["patternProperties"]
+
     local lValid as logical:=.T.
+    local lAdditionalProperties as logical:=(;
+        (!hb_HHasKey(hSchema,"additionalProperties"));
+        .or.;
+        (;
+            hb_HHasKey(hSchema,"additionalProperties");
+            .and.;
+            (ValType(hSchema["additionalProperties"])=="L");
+            .and.;
+            (hSchema["additionalProperties"]);
+        );
+    )
 
     hb_Default(@cNode,"root")
 
@@ -580,8 +594,10 @@ method ChackPatternProperties(hData as hash,hPatternProperties,cNode) class JSON
 
         for each cProperty in hb_HKeys(hData)
             cNodeProperty:=(cNode+"."+cProperty)
+            hMatch[cProperty]:=.F.
             for each cPattern in hb_HKeys(hPatternProperties)
                 if (self:RegexMatch(cProperty,cPattern,.F.))
+                    hMatch[cProperty]:=.T.
                     if (!self:ValidateObject(hData[cProperty],hPatternProperties[cPattern],cNodeProperty))
                         lValid:=.F.
                         if (self:lFastMode)
@@ -591,6 +607,20 @@ method ChackPatternProperties(hData as hash,hPatternProperties,cNode) class JSON
                 endif
             next each //cPattern
         next each //cProperty
+
+        if (!lAdditionalProperties)
+            for each cProperty in hb_HKeys(hMatch)
+                if (hMatch[cProperty])
+                    loop
+                endif
+                cNodeProperty:=(cNode+"."+cProperty)
+                lValid:=.F.
+                self:AddError(cNode,cNode+" does not allow additional property. Extra property found: "+cNodeProperty)
+                if (self:lFastMode)
+                    break
+                endif
+            next each //cProperty
+        endif
 
     end sequence
 
@@ -808,7 +838,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
         endif
 
         if (hb_HHasKey(hSchema,"patternProperties"))
-            if (!self:ChackPatternProperties(xData,hSchema["patternProperties"],cNode))
+            if (!self:CheckPatternProperties(xData,hSchema,cNode))
                 if (self:lFastMode)
                     break
                 endif
