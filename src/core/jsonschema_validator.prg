@@ -49,6 +49,7 @@ class JSONSchemaValidator
     method CheckFormat(cValue as character,cFormat as character,cNode as character) as logical
     method CheckNumber(nValue as numeric,hSchema as hash,cNode as character) as logical
     method CheckPattern(cValue as character,cPattern as character,cNode as character) as logical
+    method ChackPatternProperties(hData as hash,hPatternProperties,cNode) as logical
     method CheckRequired(hData as hash,aRequired as array,cNode as character) as logical
     method CheckString(cValue as numeric,hSchema as hash,cNode as character) as logical
     method CheckType(xValue as anytype,xType as anytype,cNode as character) as logical
@@ -565,6 +566,36 @@ method CheckPattern(cValue as character,cPattern as character,cNode as character
 
     return(lValid)
 
+method ChackPatternProperties(hData as hash,hPatternProperties,cNode) class JSONSchemaValidator
+
+    local cPattern as character
+    local cProperty as character
+    local cNodeProperty as character
+
+    local lValid as logical:=.T.
+
+    hb_Default(@cNode,"root")
+
+    begin sequence
+
+        for each cProperty in hb_HKeys(hData)
+            cNodeProperty:=(cNode+"."+cProperty)
+            for each cPattern in hb_HKeys(hPatternProperties)
+                if (self:RegexMatch(cProperty,cPattern,.F.))
+                    if (!self:ValidateObject(hData[cProperty],hPatternProperties[cPattern],cNodeProperty))
+                        lValid:=.F.
+                        if (self:lFastMode)
+                            break
+                        endif
+                    endif
+                endif
+            next each //cPattern
+        next each //cProperty
+
+    end sequence
+
+    return(lValid)
+
 method CheckRequired(hData as hash,aRequired as array,cNode as character) class JSONSchemaValidator
 
     local cProperty as character
@@ -770,6 +801,14 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
 
         if (hb_HHasKey(hSchema,"enum"))
             if (!self:CheckEnum(xData,hSchema["enum"],cNode))
+                if (self:lFastMode)
+                    break
+                endif
+            endif
+        endif
+
+        if (hb_HHasKey(hSchema,"patternProperties"))
+            if (!self:ChackPatternProperties(xData,hSchema["patternProperties"],cNode))
                 if (self:lFastMode)
                     break
                 endif
