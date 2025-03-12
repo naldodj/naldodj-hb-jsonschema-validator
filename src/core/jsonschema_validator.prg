@@ -582,6 +582,12 @@ method CheckPatternProperties(hData as hash,hSchema as hash,cNode) class JSONSch
         (;
             hb_HHasKey(hSchema,"additionalProperties");
             .and.;
+            (ValType(hSchema["additionalProperties"])=="H");
+        );
+        .or.;
+        (;
+            hb_HHasKey(hSchema,"additionalProperties");
+            .and.;
             (ValType(hSchema["additionalProperties"])=="L");
             .and.;
             (hSchema["additionalProperties"]);
@@ -618,6 +624,27 @@ method CheckPatternProperties(hData as hash,hSchema as hash,cNode) class JSONSch
                 self:AddError(cNode,cNode+" does not allow additional property. Extra property found: "+cNodeProperty)
                 if (self:lFastMode)
                     break
+                endif
+            next each //cProperty
+        endif
+
+        lAdditionalProperties:=(;
+            hb_HHasKey(hSchema,"additionalProperties");
+            .and.;
+            (ValType(hSchema["additionalProperties"])=="H");
+        )
+
+        if (lAdditionalProperties)
+            for each cProperty in hb_HKeys(hMatch)
+                if (hMatch[cProperty])
+                    loop
+                endif
+                cNodeProperty:=(cNode+"."+cProperty)
+                if (!self:ValidateObject(hData[cProperty],hSchema["additionalProperties"],cNodeProperty))
+                    lValid:=.F.
+                    if (self:lFastMode)
+                        break
+                    endif
                 endif
             next each //cProperty
         endif
@@ -796,7 +823,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
 
     local cType as character
     local cProperty as character
-    local cPropertyNode as character
+    local cNodeProperty as character
 
     local hProperties as hash
 
@@ -903,16 +930,16 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
         hProperties:=hSchema["properties"]
         for each cProperty in hb_HKeys(hProperties)
             if (hb_HHasKey(xData,cProperty))
-                cPropertyNode:=(cNode+"."+cProperty)
+                cNodeProperty:=(cNode+"."+cProperty)
                 lHasRef:=hb_HHasKey(hProperties[cProperty],"$ref")
                 if (lHasRef)
-                    hPropertySchema:=self:ResolveRef(hProperties[cProperty]["$ref"],cPropertyNode)
+                    hPropertySchema:=self:ResolveRef(hProperties[cProperty]["$ref"],cNodeProperty)
                 else
                     hPropertySchema:=hProperties[cProperty]
                 endif
                 if (hb_HHasKey(hPropertySchema,"type"))
                     xType:=hPropertySchema["type"]
-                    lValid:=self:CheckType(xData[cProperty],xType,cPropertyNode)
+                    lValid:=self:CheckType(xData[cProperty],xType,cNodeProperty)
                     if (!lValid)
                         if (self:lFastMode)
                             break
@@ -920,7 +947,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
                         loop
                     endif
                     if (hb_HHasKey(hPropertySchema,"enum"))
-                        if (!self:CheckEnum(xData[cProperty],hPropertySchema["enum"],cPropertyNode))
+                        if (!self:CheckEnum(xData[cProperty],hPropertySchema["enum"],cNodeProperty))
                             if (self:lFastMode)
                                 break
                             endif
@@ -938,7 +965,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
                                     hPrefixItemsSchema:={=>}
                                 endif
                                 if (hb_HHasKey(hPrefixItemsSchema,"prefixItems"))
-                                    if (!self:CheckArrayPrefixItems(xData[cProperty],hPrefixItemsSchema,cPropertyNode))
+                                    if (!self:CheckArrayPrefixItems(xData[cProperty],hPrefixItemsSchema,cNodeProperty))
                                         if (self:lFastMode)
                                             break
                                         endif
@@ -952,7 +979,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
                                         hItemsSchema:={=>}
                                     endif
                                     if (hb_HHasKey(hItemsSchema,"items"))
-                                        if (!self:CheckArrayItems(xData[cProperty],hItemsSchema,cPropertyNode))
+                                        if (!self:CheckArrayItems(xData[cProperty],hItemsSchema,cNodeProperty))
                                             if (self:lFastMode)
                                                 break
                                             endif
@@ -961,14 +988,14 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
                                 endif
                                 exit
                             case "string"
-                                if (!self:CheckString(xData[cProperty],hPropertySchema,cPropertyNode))
+                                if (!self:CheckString(xData[cProperty],hPropertySchema,cNodeProperty))
                                     if (self:lFastMode)
                                         break
                                     endif
                                 endif
                                 exit
                             case "object"
-                                if (!self:ValidateObject(xData[cProperty],hPropertySchema,cPropertyNode))
+                                if (!self:ValidateObject(xData[cProperty],hPropertySchema,cNodeProperty))
                                     if (self:lFastMode)
                                         break
                                     endif
@@ -976,7 +1003,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
                                 exit
                             case "integer"
                             case "number"
-                                if (!self:CheckNumber(xData[cProperty],hPropertySchema,cPropertyNode))
+                                if (!self:CheckNumber(xData[cProperty],hPropertySchema,cNodeProperty))
                                     if (self:lFastMode)
                                         break
                                     endif
@@ -986,7 +1013,7 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
                     endif
                 endif
                 if (hb_HHasKey(hPropertySchema,"format"))
-                    if (!self:CheckFormat(xData[cProperty],hPropertySchema["format"],cPropertyNode))
+                    if (!self:CheckFormat(xData[cProperty],hPropertySchema["format"],cNodeProperty))
                         if (self:lFastMode)
                             break
                         endif
@@ -994,6 +1021,32 @@ method ValidateObject(xData as anytype,hSchema as hash,cNode as character) class
                 endif
             endif
         next each //cProperty
+
+        if (hb_HHasKey(hSchema,"additionalProperties"))
+            cType:=valType(hSchema["additionalProperties"])
+            if ((cType=="L").and.(!hSchema["additionalProperties"]))
+                for each cProperty in hb_HKeys(xData)
+                    if (!hb_HHasKey(hProperties,cProperty))
+                        cNodeProperty:=(cNode+"."+cProperty)
+                        self:AddError(cNode,cNode+" does not allow additional property. Extra property found: "+cNodeProperty)
+                        if (self:lFastMode)
+                            break
+                        endif
+                    endif
+                next each //cProperty
+            elseif (cType=="H")
+                for each cProperty in hb_HKeys(xData)
+                    if (!hb_HHasKey(hProperties,cProperty))
+                        cNodeProperty:=(cNode+"."+cProperty)
+                        if (!self:ValidateObject(xData[cProperty],hSchema["additionalProperties"],cNodeProperty))
+                            if (self:lFastMode)
+                                break
+                            endif
+                        endif
+                    endif
+                next each //cProperty
+            endif
+        endif
 
     end sequence
 
